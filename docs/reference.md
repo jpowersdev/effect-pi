@@ -54,7 +54,7 @@ A session provides:
 
 `Session.make({ id, cwd, configure? })` needs `FileSystem`, `Path`, `KeyValueStore`, and a `Scope`. It does not require `Sessions` or Cluster. Each call creates its own resource; do not independently construct the same stored id twice.
 
-See [SingleSession.ts](../examples/SingleSession.ts).
+See [single-session.ts](../examples/single-session.ts).
 
 ### Local sessions
 
@@ -62,7 +62,7 @@ See [SingleSession.ts](../examples/SingleSession.ts).
 
 This is the preferred choice for a single owning Node process. Other processes can use that application's existing HTTP/RPC interface.
 
-See [LocalSessionPool.ts](../examples/LocalSessionPool.ts).
+See [local-session-pool.ts](../examples/local-session-pool.ts).
 
 ### Cluster sessions
 
@@ -78,7 +78,7 @@ Runner defaults:
 
 Long-lived event subscriptions keep resources in use. Runner and client processes must use compatible package versions and cluster configuration. The mailbox limit is not a global cap on active prompt requests; handlers run concurrently so aborts and events can proceed during prompts.
 
-The self-contained [cluster example](../examples/ClusterSession.ts) starts a runner and a client in one process. They use separate sharding runtimes and communicate over a loopback socket. Discovery and cluster message storage are shared in memory; SQLite stores the conversation documents. `Layer.fresh` keeps the differently configured cluster runtimes from sharing memoized services. Their lifetimes are scoped together, so both shut down when the example finishes.
+The self-contained [cluster example](../examples/cluster-session.ts) starts a runner and a client in one process. They use separate sharding runtimes and communicate over a loopback socket. Discovery and cluster message storage are shared in memory; SQLite stores the conversation documents. `Layer.fresh` keeps the differently configured cluster runtimes from sharing memoized services. Their lifetimes are scoped together, so both shut down when the example finishes.
 
 SQLite supports this local demo. Across machines, use a shared database for coordination and session documents; do not put SQLite on a network filesystem.
 
@@ -142,7 +142,7 @@ Operational failures use `_tag: "SessionError"` with `sessionId`, `operation`, a
 
 Events have monotonically increasing sequence numbers **per live resource**, resetting on restoration. The live buffer holds 1,024 events and discards oldest events on overflow. Slow subscribers can see gaps. There is no replay or subscription persistence. Reconcile using `snapshot`/`jsonl` or the completed prompt result; an event is not a durability acknowledgement.
 
-Start the stream before prompting. Across Cluster, starting a client fiber does not acknowledge that the remote subscription is established, so initial events can be missed. See [ClusterSession.ts](../examples/ClusterSession.ts) for best-effort event consumption in a scope.
+Start the stream before prompting. Across Cluster, starting a client fiber does not acknowledge that the remote subscription is established, so initial events can be missed. See [cluster-session.ts](../examples/cluster-session.ts) for best-effort event consumption in a scope.
 
 ## Persistence contract
 

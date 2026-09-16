@@ -28,7 +28,7 @@ export const program = Effect.gen(function*() {
 
 Use the same id and storage to continue the conversation later. You can also listen to `session.events`, check progress with `session.snapshot`, or stop the current prompt with `session.abort`.
 
-The [complete local example](examples/LocalSessionPool.ts) shows how to provide the model, storage, and session layer around this code.
+The [complete local example](examples/local-session-pool.ts) shows how to provide the model, storage, and session layer around this code.
 
 ## Try it
 
@@ -49,9 +49,9 @@ The examples use SQLite to save conversations and explicitly configure Pi rather
 
 There are three ways to use the library:
 
-- **One session:** [`SingleSession.ts`](examples/SingleSession.ts) sends a prompt and saves the conversation.
-- **A pool of sessions:** [`LocalSessionPool.ts`](examples/LocalSessionPool.ts) opens a session, releases it, and reopens it in another request. This is the best place to start.
-- **Cluster-backed sessions:** [`ClusterSession.ts`](examples/ClusterSession.ts) starts a client and runner in one process, communicating over a local socket.
+- **One session:** [`single-session.ts`](examples/single-session.ts) sends a prompt and saves the conversation.
+- **A pool of sessions:** [`local-session-pool.ts`](examples/local-session-pool.ts) opens a session, releases it, and reopens it in another request. This is the best place to start.
+- **Cluster-backed sessions:** [`cluster-session.ts`](examples/cluster-session.ts) starts a client and runner in one process, communicating over a local socket.
 
 Each example is self-contained, including its configuration and storage setup.
 

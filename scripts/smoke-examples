@@ -17,6 +17,6 @@ unset EFFECT_PI_SESSION_ID
 # Each program owns all of its resources, including both cluster runtimes.
 # A second cluster run checks that the first one released its listener.
 # timeout's kill-after is only a test harness safeguard.
-for example in SingleSession LocalSessionPool ClusterSession ClusterSession; do
+for example in single-session local-session-pool cluster-session cluster-session; do
   timeout --kill-after=5s 30s node "dist-examples/$example.js" --snapshot
 done

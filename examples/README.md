@@ -4,9 +4,9 @@ Each example is a complete program. Pick one file and copy it into your projectâ
 
 | Example | What it shows |
 | --- | --- |
-| [SingleSession.ts](SingleSession.ts) | Create one session, send a prompt, and save its history in SQLite. |
-| [LocalSessionPool.ts](LocalSessionPool.ts) | Open a session through a pool, release it, then reopen it in another request scope. |
-| [ClusterSession.ts](ClusterSession.ts) | Start a runner and a client in the same process, send requests over a local socket, then shut both down. |
+| [single-session.ts](single-session.ts) | Create one session, send a prompt, and save its history in SQLite. |
+| [local-session-pool.ts](local-session-pool.ts) | Open a session through a pool, release it, then reopen it in another request scope. |
+| [cluster-session.ts](cluster-session.ts) | Start a runner and a client in the same process, send requests over a local socket, then shut both down. |
 
 ## Setup
 
@@ -38,9 +38,9 @@ pnpm example:cluster "Say hello in one sentence"
 Or run the compiled files directly:
 
 ```sh
-node dist-examples/SingleSession.js "Say hello in one sentence"
-node dist-examples/LocalSessionPool.js "Say hello in one sentence"
-node dist-examples/ClusterSession.js "Say hello in one sentence"
+node dist-examples/single-session.js "Say hello in one sentence"
+node dist-examples/local-session-pool.js "Say hello in one sentence"
+node dist-examples/cluster-session.js "Say hello in one sentence"
 ```
 
 All three save conversations in SQLite. Run an example again with the same session id and data directory to continue its conversation. The pool example also reopens the session before exiting and prints its snapshot, showing how separate requests can use the same pool.
@@ -68,7 +68,7 @@ Use different session ids when running independent examples concurrently. They m
 
 ## How the cluster example runs
 
-You only need **one command and one terminal**. `ClusterSession.ts` starts the runner, creates a separate client runtime, and uses the public `Sessions` API to make a request. The client discovers the runner through a shared in-memory store and connects over a real loopback socket; this isn't a fake transport or a direct call to the runner's session.
+You only need **one command and one terminal**. `cluster-session.ts` starts the runner, creates a separate client runtime, and uses the public `Sessions` API to make a request. The client discovers the runner through a shared in-memory store and connects over a real loopback socket; this isn't a fake transport or a direct call to the runner's session.
 
 Both runtimes live in the same Effect scope. When the program finishes or is interrupted, it closes the client and runner and releases their resources. There is no background server to stop manually.
 
@@ -93,7 +93,7 @@ pnpm add effect@4.0.0-rc.115 @earendil-works/pi-coding-agent@0.84.4 \
 Use an ESM project (`"type": "module"`). Node 26 can run the copied TypeScript file directly:
 
 ```sh
-node SingleSession.ts --snapshot
+node single-session.ts --snapshot
 ```
 
 Set the environment variables as described above. If you compile with TypeScript, use NodeNext and `skipLibCheck` for the pinned upstream declarations.
@@ -101,5 +101,5 @@ Set the environment variables as described above. If you compile with TypeScript
 The npm tarball includes the source and compiled examples too. With their optional dependencies installed, you can run one without copying it:
 
 ```sh
-node node_modules/@jpowersdev/effect-pi/dist-examples/SingleSession.js --snapshot
+node node_modules/@jpowersdev/effect-pi/dist-examples/single-session.js --snapshot
 ```
