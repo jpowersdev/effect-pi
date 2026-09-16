@@ -15,12 +15,11 @@ Once you've set up a `Sessions` layer, your application code looks like this:
 ```ts
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
-import * as Schema from "effect/Schema"
 import { Session, Sessions } from "@jpowersdev/effect-pi"
 
 export const program = Effect.gen(function*() {
   const sessions = yield* Sessions
-  const id = yield* Schema.decodeUnknownEffect(Session.Id)("my-project")
+  const id = Session.Id.make("my-project")
   const session = yield* sessions.open(id)
   const reply = yield* session.prompt("Explain how this project is organized")
   yield* Console.log(reply.text)

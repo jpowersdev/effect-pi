@@ -91,7 +91,6 @@ import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as Schema from "effect/Schema"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 import { LocalSessions, Session, Sessions } from "@jpowersdev/effect-pi"
 
@@ -106,7 +105,7 @@ const SessionsLive = LocalSessions.layer({
 
 const program = Effect.gen(function*() {
   const sessions = yield* Sessions
-  const id = yield* Schema.decodeUnknownEffect(Session.Id)("experiment-1")
+  const id = Session.Id.make("experiment-1")
   const session = yield* sessions.open(id)
   const result = yield* session.prompt("Describe the top-level files in this repository")
   yield* Console.log(result.text)
