@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly effect_remote="https://github.com/Effect-TS/effect.git"
+readonly update_interval="${EFFECT_VENDOR_UPDATE_INTERVAL_SECONDS:-86400}"
+
+if [[ ! "$update_interval" =~ ^[0-9]+$ ]]; then
+  printf 'Invalid Effect update interval: %s\n' "$update_interval" >&2
+  exit 1
+fi
+
+if [[ -n "${EFFECT_VENDOR_PROJECT_ROOT:-}" ]]; then
+  project_root="$EFFECT_VENDOR_PROJECT_ROOT"
+elif project_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+  :
+else
+  project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+fi
+
+vendor_root="$project_root/.vendor"
+effect_root="$vendor_root/effect"
+marker="$vendor_root/.effect-last-update"
+lock="$vendor_root/.effect-update.lock"
+
+mkdir -p "$vendor_root"
+exec 9>"$lock"
+if ! flock -n 9; then
+  exit 0
+fi
+
+now="$(date +%s)"
+last_update=0
+if [[ -f "$marker" ]]; then
+  IFS= read -r last_update < "$marker"
+  if [[ ! "$last_update" =~ ^[0-9]+$ ]]; then
+    last_update=0
+  fi
+fi
+
+age=$((now - last_update))
+if ((age >= 0 && age < update_interval)); then
+  exit 0
+fi
+
+printf 'Checking the local Effect v4 reference source...\n'
+
+if [[ ! -e "$effect_root" ]]; then
+  temporary_root="$(mktemp -d "$vendor_root/.effect.tmp.XXXXXX")"
+  trap 'rm -rf "$temporary_root"' EXIT
+  git clone --depth 1 "$effect_remote" "$temporary_root"
+  mv "$temporary_root" "$effect_root"
+  trap - EXIT
+else
+  if [[ ! -d "$effect_root/.git" ]]; then
+    printf '%s exists but is not a Git checkout; refusing to replace it.\n' "$effect_root" >&2
+    exit 1
+  fi
+
+  origin="$(git -C "$effect_root" remote get-url origin)"
+  if [[ "$origin" != "$effect_remote" ]]; then
+    printf 'Unexpected Effect origin %s; expected %s.\n' "$origin" "$effect_remote" >&2
+    exit 1
+  fi
+
+  if [[ -n "$(git -C "$effect_root" status --porcelain)" ]]; then
+    printf '%s has local changes; refusing to overwrite them.\n' "$effect_root" >&2
+    exit 1
+  fi
+
+  git -C "$effect_root" fetch --depth 1 origin HEAD
+  git -C "$effect_root" reset --hard --quiet FETCH_HEAD
+fi
+
+revision="$(git -C "$effect_root" rev-parse HEAD)"
+temporary_marker="$marker.tmp.$$"
+printf '%s\n%s\n' "$now" "$revision" > "$temporary_marker"
+mv "$temporary_marker" "$marker"
+printf 'Effect reference is at %s.\n' "${revision:0:12}"

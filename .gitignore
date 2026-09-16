@@ -1,0 +1,15 @@
+.direnv/
+.tsbuildinfo/
+.vendor/
+node_modules/
+dist/
+dist-test/
+dist-examples/
+.data/
+.env
+.env.*
+!.env.example
+*.tgz
+.result/
+result
+.envrc.local
