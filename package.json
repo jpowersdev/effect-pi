@@ -31,10 +31,9 @@
     "clean": "tsc -b --clean && rm -rf dist dist-test dist-examples .tsbuildinfo",
     "prepack": "pnpm clean && pnpm check && pnpm test && pnpm build",
     "test": "vitest run",
-    "example:direct": "pnpm build && node dist-examples/Direct.js",
-    "example:local": "pnpm build && node dist-examples/Local.js",
-    "example:cluster:runner": "pnpm build && node dist-examples/ClusterRunner.js",
-    "example:cluster:client": "pnpm build && node dist-examples/ClusterClient.js"
+    "example:session": "pnpm build && node dist-examples/SingleSession.js",
+    "example:pool": "pnpm build && node dist-examples/LocalSessionPool.js",
+    "example:cluster": "pnpm build && node dist-examples/ClusterSession.js"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.84.4"

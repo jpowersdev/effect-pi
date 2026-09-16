@@ -5,15 +5,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_root"
 work="$(mktemp -d)"
-runner=""
-cleanup() {
-  if [[ -n "$runner" ]]; then
-    kill -TERM "$runner" 2>/dev/null || true
-    wait "$runner" || true
-  fi
-  rm -rf "$work"
-}
-trap cleanup EXIT
+trap 'rm -rf "$work"' EXIT
 
 export EFFECT_PI_DATA_DIR="$work/data"
 export EFFECT_PI_PROVIDER=anthropic
@@ -22,14 +14,9 @@ export EFFECT_PI_API_KEY=unused-snapshot-only
 export EFFECT_PI_RUNNER_PORT="${EFFECT_PI_RUNNER_PORT:-38479}"
 unset EFFECT_PI_SESSION_ID
 
-# timeout's kill-after is a test harness safeguard, not the library's
-# cooperative cancellation contract.
-timeout --kill-after=5s 30s node dist-examples/Direct.js --snapshot
-timeout --kill-after=5s 30s node dist-examples/Local.js --snapshot
-timeout --kill-after=5s 60s node dist-examples/ClusterRunner.js > "$work/runner.log" 2>&1 &
-runner=$!
-if ! timeout --kill-after=5s 30s node dist-examples/ClusterClient.js --snapshot; then
-  tail -n 100 "$work/runner.log" >&2
-  exit 1
-fi
-timeout --kill-after=5s 30s node dist-examples/ClusterClient.js --snapshot
+# Each program owns all of its resources, including both cluster runtimes.
+# A second cluster run checks that the first one released its listener.
+# timeout's kill-after is only a test harness safeguard.
+for example in SingleSession LocalSessionPool ClusterSession ClusterSession; do
+  timeout --kill-after=5s 30s node "dist-examples/$example.js" --snapshot
+done

@@ -21,6 +21,7 @@ pnpm pack --pack-destination /tmp/effect-pi-pack
 - Prompt cancellation must settle the underlying SDK operation before the gate or resource is released.
 - Do not persist model prompt RPCs without a real idempotency protocol.
 - Live events are bounded and ephemeral, not another durable conversation log.
+- Keep examples self-contained, even when that repeats setup. The cluster example owns both the runner and client in one process.
 
 See `AGENTS.md` and `EFFECT.md` for implementation guidance. Where the SDK offers no cancellation API, document the protected acquisition/cleanup boundary rather than pretending interruption can force it to stop.
 
@@ -34,4 +35,4 @@ See `AGENTS.md` and `EFFECT.md` for implementation guidance. Where the SDK offer
 6. If Git history is available, scan it for secrets before making the repository public. Never include real credentials or transcripts in fixtures/issues.
 7. Review API/known-limitations documentation, then publish the reviewed tarball from the intended npm account. Use npm 2FA or trusted publishing; add provenance when the release environment supports it.
 
-CI checks build/test/package creation and exercises the direct/local/socket-cluster examples without model requests. Production network partitions, forced process loss, and paid provider behavior still require separate integration validation.
+CI checks build/test/package creation and exercises the self-contained session, pool, and single-process socket-cluster examples without model requests. Production network partitions, forced process loss, and paid provider behavior still require separate integration validation.

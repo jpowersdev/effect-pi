@@ -1,4 +1,6 @@
+/** Share sessions by id and reopen them across separate request scopes. */
 import * as Pi from "@earendil-works/pi-coding-agent"
+import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
 import * as Config from "effect/Config"
@@ -12,31 +14,13 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 
-import { Session } from "@jpowersdev/effect-pi"
+import { LocalSessions, Session, Sessions } from "@jpowersdev/effect-pi"
 
-export class ExampleError extends Schema.TaggedError<ExampleError>()("ExampleError", {
+class ExampleError extends Schema.TaggedError<ExampleError>()("ExampleError", {
   message: Schema.String
 }) {}
 
-const dataDirectory = Effect.gen(function*() {
-  const path = yield* Path.Path
-  const directory = yield* Config.NonEmptyString("EFFECT_PI_DATA_DIR").pipe(Config.withDefault(".data/effect-pi"))
-  return path.resolve(directory)
-})
-
-/** SQLite provides atomic document replacement, unlike a plain file overwrite. */
-export const SqlLive = Layer.unwrap(Effect.gen(function*() {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const directory = yield* dataDirectory
-  yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 })
-  return SqliteClient.layer({ filename: path.join(directory, "sessions.sqlite") })
-})).pipe(Layer.provide(NodeServices.layer))
-
-export const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(Layer.provide(SqlLive))
-export const SessionDependencies = Layer.merge(NodeServices.layer, StoreLive)
-
-/** Explicit resources: no global/project extension, skill, or context discovery. */
+// Each live session gets its own loader, without global/project discovery.
 const resources = (): Pi.ResourceLoader => {
   const extensions = { extensions: [], errors: [], runtime: Pi.createExtensionRuntime() }
   return {
@@ -54,14 +38,21 @@ const resources = (): Pi.ResourceLoader => {
   }
 }
 
-/** Preparing SDK configuration is effectful; configure itself is synchronous. */
-export const sessionConfig = Effect.gen(function*() {
+const program = Effect.gen(function*() {
+  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const directory = yield* dataDirectory
+  const directory = path.resolve(yield* Config.NonEmptyString("EFFECT_PI_DATA_DIR").pipe(
+    Config.withDefault(".data/effect-pi")
+  ))
+  yield* fs.makeDirectory(directory, { recursive: true, mode: 0o700 })
+  const cwd = path.resolve(yield* Config.NonEmptyString("EFFECT_PI_CWD").pipe(Config.withDefault(process.cwd())))
+  const id = yield* Config.schema(Session.Id, "EFFECT_PI_SESSION_ID").pipe(
+    Config.withDefault(Session.Id.make("pooled-session"))
+  )
   const provider = yield* Config.NonEmptyString("EFFECT_PI_PROVIDER")
   const modelId = yield* Config.NonEmptyString("EFFECT_PI_MODEL")
   const apiKey = yield* Config.Redacted("EFFECT_PI_API_KEY")
-  const cwd = yield* Config.NonEmptyString("EFFECT_PI_CWD").pipe(Config.withDefault(process.cwd()))
+
   const modelRuntime = yield* Effect.tryPromise({
     try: (signal) => Pi.ModelRuntime.create({
       authPath: path.join(directory, "auth.json"),
@@ -79,8 +70,12 @@ export const sessionConfig = Effect.gen(function*() {
     try: (signal) => modelRuntime.setRuntimeApiKey(provider, Redacted.value(apiKey), { signal }),
     catch: (cause) => new ExampleError({ message: String(cause) })
   })
-  const config: Session.Config = {
-    cwd: path.resolve(cwd),
+
+  const SqlLive = SqliteClient.layer({ filename: path.join(directory, "sessions.sqlite") })
+  const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(Layer.provide(SqlLive))
+  const SessionsLive = LocalSessions.layer({
+    cwd,
+    idleTimeToLive: "1 minute",
     configure: () => ({
       modelRuntime,
       model,
@@ -88,26 +83,34 @@ export const sessionConfig = Effect.gen(function*() {
       settingsManager: Pi.SettingsManager.inMemory({ retry: { enabled: false } }),
       resourceLoader: resources()
     })
-  }
-  return config
-}).pipe(Effect.provide(NodeServices.layer))
+  }).pipe(Layer.provide(StoreLive))
 
-export const sessionId = (fallback: string) => Config.NonEmptyString("EFFECT_PI_SESSION_ID").pipe(
-  Config.withDefault(fallback),
-  Effect.flatMap(Schema.decodeUnknownEffect(Session.Id))
-)
+  yield* Effect.gen(function*() {
+    const sessions = yield* Sessions
 
-export const run = (session: Session.Session) => Effect.gen(function*() {
-  if (process.argv[2] === "--snapshot") {
-    // Exercises acquisition/restoration without invoking a model or any tools.
-    return yield* Console.log(yield* session.snapshot)
-  }
-  yield* session.events.pipe(
-    Stream.runForEach((event) => Console.log(event)),
-    Effect.catch((error) => Console.warn(error)),
-    Effect.forkScoped({ startImmediately: true })
-  )
-  const text = process.argv.slice(2).join(" ") || "Say hello in one short sentence."
-  const result = yield* session.prompt(text).pipe(Effect.timeout("2 minutes"))
-  yield* Console.log("Result:", result)
-})
+    // A request holds a reference to the session for the duration of its scope.
+    yield* Effect.scoped(Effect.gen(function*() {
+      const session = yield* sessions.open(id)
+      if (process.argv[2] === "--snapshot") {
+        return yield* Console.log(yield* session.snapshot)
+      }
+      yield* session.events.pipe(
+        Stream.runForEach((event) => Console.log(event)),
+        Effect.catch((error) => Console.warn(error)),
+        Effect.forkScoped({ startImmediately: true })
+      )
+      const text = process.argv.slice(2).join(" ") || "Say hello in one short sentence."
+      const result = yield* session.prompt(text).pipe(Effect.timeout("2 minutes"))
+      yield* Console.log("Result:", result)
+    }))
+
+    // The pool stays alive between requests. This reuses the same live session
+    // while its idle TTL has not expired; after eviction it restores from SQLite.
+    yield* Effect.scoped(Effect.gen(function*() {
+      const session = yield* sessions.open(id)
+      yield* Console.log("Reopened:", yield* session.snapshot)
+    }))
+  }).pipe(Effect.provide(SessionsLive))
+}).pipe(Effect.scoped, Effect.provide(NodeServices.layer))
+
+NodeRuntime.runMain(program)

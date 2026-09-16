@@ -28,7 +28,7 @@ export const program = Effect.gen(function*() {
 
 Use the same id and storage to continue the conversation later. You can also listen to `session.events`, check progress with `session.snapshot`, or stop the current prompt with `session.abort`.
 
-The [complete local example](examples/Local.ts) shows how to provide the model, storage, and session layer around this code.
+The [complete local example](examples/LocalSessionPool.ts) shows how to provide the model, storage, and session layer around this code.
 
 ## Try it
 
@@ -42,16 +42,18 @@ pnpm build
 Follow the [example setup](examples/README.md#setup) to choose a model and configure credentials, then run:
 
 ```sh
-pnpm example:local "Say hello in one sentence"
+pnpm example:pool "Say hello in one sentence"
 ```
 
 The examples use SQLite to save conversations and explicitly configure Pi rather than loading your usual extensions and settings.
 
 There are three ways to use the library:
 
-- **One session:** [`Session.make`](examples/Direct.ts) creates a session that lives for an Effect scope.
-- **Several sessions in one process:** [`LocalSessions`](examples/Local.ts) shares sessions by id and releases them when they're no longer in use. This is the best place to start.
-- **Sessions on worker processes:** the [cluster example](examples/README.md#cluster-two-processes) runs a client and worker separately, using the same `Sessions` interface.
+- **One session:** [`SingleSession.ts`](examples/SingleSession.ts) sends a prompt and saves the conversation.
+- **A pool of sessions:** [`LocalSessionPool.ts`](examples/LocalSessionPool.ts) opens a session, releases it, and reopens it in another request. This is the best place to start.
+- **Cluster-backed sessions:** [`ClusterSession.ts`](examples/ClusterSession.ts) starts a client and runner in one process, communicating over a local socket.
+
+Each example is self-contained, including its configuration and storage setup.
 
 For use in another project, see [installation and compatibility](docs/reference.md#installation-and-compatibility). The package is named `@jpowersdev/effect-pi` and currently uses Effect `4.0.0-rc.115` and Pi `0.84.4`.
 
