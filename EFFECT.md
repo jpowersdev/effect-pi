@@ -1,7 +1,7 @@
 # Building maintainable Effect applications
 
-A reusable engineering guide for TypeScript applications built with Effect v4,
-Node, HTTP APIs, React, and Effect Atom.
+A reusable engineering guide for TypeScript applications built with Effect v4
+and Node.
 
 This document describes application structure and correctness conventions. It is
 not a product architecture. Copy or reference it from a repository's
@@ -15,7 +15,7 @@ not a product architecture. Copy or reference it from a repository's
 1. **Use Effect for control flow and platform integration.** Application methods
    return `Effect`; they do not expose raw `Promise` values.
 2. **Decode at every external boundary.** Files, environment values, CLI input,
-   HTTP data, database rows, SDK payloads, and URL values begin as `unknown`.
+   database rows, and SDK payloads begin as `unknown`.
 3. **Make illegal states unrepresentable.** Prefer branded values, literal
    unions, tagged unions, and `Option` over casts and optional-field bags.
 4. **Expected failures are typed values.** Use yieldable
@@ -25,15 +25,11 @@ not a product architecture. Copy or reference it from a repository's
    requirements into consumer environments.
 6. **Composition over inheritance.** Classes are acceptable for Effect service
    tags and schema-backed tagged errors, not for domain class hierarchies.
-7. **One contract drives every transport.** Shared schemas define HTTP server
-   handlers, inferred clients, OpenAPI, stream payloads, and errors.
-8. **React renders reactive state.** Effect Atom owns frontend effects, caching,
-   mutation state, streams, cancellation, and refresh dependencies.
-9. **Strictness is a design tool.** Do not weaken TypeScript to make an invalid
+7. **Strictness is a design tool.** Do not weaken TypeScript to make an invalid
    design compile.
-10. **Test behavior through production boundaries.** Use real schemas, layers,
-    disposable resources, and generated clients rather than reimplementing
-    production logic in tests.
+8. **Test behavior through production boundaries.** Use real schemas, layers,
+   disposable resources, and service APIs rather than reimplementing production
+   logic in tests.
 
 ## Package and version policy
 
@@ -42,7 +38,6 @@ not a product architecture. Copy or reference it from a repository's
 - Pin `effect`, `@effect/*`, and `@effect/vitest` to the same exact release.
 - Prefer exact versions for foundational runtime packages. Upgrade them as one
   reviewed change.
-- Keep browser-only dependencies out of backend source modules.
 - Treat modules under `effect/unstable/*` as version-sensitive boundaries.
 
 A typical package starts with scripts like:
@@ -52,9 +47,9 @@ A typical package starts with scripts like:
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
-    "build": "tsc -b src web && vite build",
+    "build": "tsc -b src",
     "check": "tsc -b",
-    "clean": "tsc -b --clean && rm -rf dist dist-test dist-web",
+    "clean": "tsc -b --clean && rm -rf dist dist-test",
     "test": "vitest run"
   }
 }
@@ -69,7 +64,6 @@ import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Option from "effect/Option"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import * as React from "react"
 ```
 
 Use namespace imports for internal concept modules as well:
@@ -105,9 +99,7 @@ src/
 ├── WorkflowError.ts
 ├── Project.ts
 ├── Process.ts
-├── WorkbenchApi.ts
-├── Workbench.ts
-└── Main.ts
+└── Workbench.ts
 
 test/
 ├── Artifact.test.ts
@@ -116,19 +108,11 @@ test/
 ├── Project.test.ts
 ├── Process.test.ts
 └── Workbench.test.ts
-
-web/
-├── ApiClient.ts
-├── ApplicationAtoms.ts
-├── App.tsx
-├── DomainViews.tsx
-├── DomainViews.test.tsx
-└── Main.tsx
 ```
 
 Rules:
 
-- Files use `PascalCase.ts` or `PascalCase.tsx`.
+- Reusable modules use `PascalCase.ts`; executable entrypoints use `kebab-case.ts`.
 - Each module owns one concept, domain model, adapter, service, or boundary.
 - Avoid generic directories such as `utils`, `helpers`, and `common`.
 - Extract a named module when behavior has a distinct vocabulary, dependency
@@ -143,7 +127,7 @@ or which invariant it preserves. Do not paraphrase obvious code.
 
 ## TypeScript solution structure
 
-Use separate composite projects for backend source, backend tests, and web code.
+Use separate composite projects for source and tests.
 The root is a solution file only.
 
 ### `tsconfig.base.json`
@@ -212,25 +196,6 @@ The root is a solution file only.
 }
 ```
 
-### `web/tsconfig.json`
-
-```json
-{
-  "extends": "../tsconfig.base.json",
-  "compilerOptions": {
-    "composite": true,
-    "noEmit": true,
-    "rootDir": ".",
-    "jsx": "react-jsx",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["vite/client"],
-    "tsBuildInfoFile": "../dist-web/.tsbuildinfo"
-  },
-  "references": [{ "path": "../src" }],
-  "include": ["*.ts", "*.tsx"]
-}
-```
-
 ### Root `tsconfig.json`
 
 ```json
@@ -238,7 +203,6 @@ The root is a solution file only.
   "files": [],
   "references": [
     { "path": "./src" },
-    { "path": "./web" },
     { "path": "./test" }
   ]
 }
@@ -262,7 +226,7 @@ export const User = Schema.Struct({
   name: Schema.NonEmptyString,
   status: Schema.Literals(["active", "suspended"])
 }).annotate({
-  description: "A user returned to generated clients."
+  description: "A user returned by the Users service."
 })
 export type User = typeof User.Type
 ```
@@ -279,8 +243,7 @@ Brand identifiers end to end:
 - graph identity
 - Git commit or branch values when confusion is dangerous
 
-Do not decode a brand and then weaken it back to `string` in an API, service, or
-frontend atom.
+Do not decode a brand and then weaken it back to `string` in an API or service.
 
 ### Prefer literal unions
 
@@ -528,7 +491,6 @@ Use Effect platform services instead of direct Node APIs:
 - `Path.Path`, not `node:path` in ordinary application code
 - `Crypto.Crypto`, not ad hoc random or hashing calls
 - Effect process/spawner APIs, not raw `child_process`
-- Effect HTTP server/client modules, not untyped fetch wrappers
 
 Platform-specific imports belong in adapters and entrypoints. Domain modules
 should not know they run on Node.
@@ -571,7 +533,7 @@ const invoke = Effect.fn("Vendor.invoke")((request: Request) =>
 )
 ```
 
-Do not let raw Promises escape into domain services or React components.
+Do not let raw Promises escape into domain services.
 
 ## Persistence and files
 
@@ -588,263 +550,6 @@ Do not let raw Promises escape into domain services or React components.
 Do not use a database to duplicate an authoritative external log or event store.
 Store only indexes, coordination state, or metadata that the authoritative
 source does not already provide.
-
-## Executable boundary
-
-Keep `Main.ts` tiny:
-
-```ts
-#!/usr/bin/env node
-
-import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-
-import * as Cli from "./Cli.js"
-import * as Application from "./Application.js"
-
-const main = Cli.runWith(process.argv.slice(2)).pipe(
-  Effect.provide(Layer.mergeAll(
-    Application.layer,
-    NodeServices.layer
-  ))
-)
-
-NodeRuntime.runMain(main)
-```
-
-The entrypoint may read `process.argv` and select platform layers. Business
-logic, decoding, and error mapping live elsewhere.
-
-## HTTP API design
-
-Define one shared `HttpApi` in backend source. It is the transport contract for
-both server and browser.
-
-### Contract rules
-
-- Request params, query, headers, and payloads are schemas.
-- Success responses are schemas.
-- Every declared failure is a schema-backed tagged error.
-- Add client-relevant documentation with schema `description` annotations.
-- Put HTTP status metadata directly on domain API errors.
-- Do not create redundant `FooResponse` schemas that merely duplicate the
-  domain value.
-- Re-export canonical branded identities rather than redefining weaker browser
-  versions.
-- Use SSE schemas for typed streams.
-
-```ts
-export class RequestError extends Schema.TaggedErrorClass<RequestError>()(
-  "RequestError",
-  { message: Schema.String },
-  { httpApiStatus: 400 }
-) {}
-
-export class UserNotFound extends Schema.TaggedErrorClass<UserNotFound>()(
-  "UserNotFound",
-  {
-    userId: UserId,
-    message: Schema.String
-  },
-  { httpApiStatus: 404 }
-) {}
-```
-
-Group endpoints by stable domain capability:
-
-```ts
-const UsersApi = HttpApiGroup.make("users")
-  .add(HttpApiEndpoint.get("get", "/api/users/:userId", {
-    params: Schema.Struct({ userId: UserId }),
-    success: User,
-    error: [UserNotFound]
-  }))
-
-export const api = HttpApi.make("ApplicationApi").add(UsersApi)
-```
-
-### Server handlers
-
-Handlers should decode through the API automatically and delegate immediately
-to application services:
-
-```ts
-export function apiLayer() {
-  return HttpApiBuilder.group(
-    Api.api,
-    "users",
-    Effect.fnUntraced(function* (handlers) {
-      const users = yield* Users
-      return handlers.handle("get", request =>
-        users.load(request.params.userId))
-    })
-  ).pipe(Layer.provide(Users.layer))
-}
-```
-
-Do not repeat schema validation or business logic in handlers.
-
-### Streams
-
-Use `HttpApiSchema.StreamSse` for typed server-sent event payloads and typed
-stream errors. Persist durable history elsewhere; streams should carry live,
-ephemeral activity rather than becoming an accidental database.
-
-## Frontend architecture with Effect Atom
-
-React components should subscribe to reactive values and write user intent.
-They should not manually run or supervise Effect fibers.
-
-### Registry root
-
-```tsx
-import * as AtomReact from "@effect/atom-react"
-import * as React from "react"
-import * as ReactDom from "react-dom/client"
-
-ReactDom.createRoot(root).render(
-  <React.StrictMode>
-    <AtomReact.RegistryProvider>
-      <App />
-    </AtomReact.RegistryProvider>
-  </React.StrictMode>
-)
-```
-
-The registry owns atom subscriptions, caching, cancellation, stream lifetimes,
-and idle cleanup.
-
-### Native HttpApi integration
-
-Use `AtomHttpApi.Service`; do not add a separate `ManagedRuntime` merely to run
-HTTP requests.
-
-```ts
-import * as FetchHttpClient from "effect/unstable/http/FetchHttpClient"
-import * as AtomHttpApi from "effect/unstable/reactivity/AtomHttpApi"
-
-export class ApplicationClient extends AtomHttpApi.Service<ApplicationClient>()(
-  "application/web/ApplicationClient",
-  {
-    api: Api.api,
-    httpClient: FetchHttpClient.layer,
-    baseUrl: globalThis.location.origin
-  }
-) {}
-```
-
-Define cached query families through the generated client:
-
-```ts
-export const user = (id: UserId) =>
-  ApplicationClient.query("users", "get", {
-    params: { userId: id },
-    timeToLive: "2 seconds"
-  })
-```
-
-Use the service's atom runtime for mutations and streams:
-
-```ts
-export const saveUser = ApplicationClient.runtime.fn(
-  (input: SaveUserInput, get) =>
-    ApplicationClient.use(client =>
-      client.users.save({ payload: input })
-    ).pipe(
-      Effect.tap(() => Effect.sync(() => {
-        get.refresh(currentUser)
-      }))
-    )
-)
-```
-
-Rules:
-
-- No scattered `Effect.runPromise`, `Effect.runFork`, or `Effect.runSync` in
-  components.
-- No component-owned fibers for SSE or subscriptions.
-- Queries expose `AsyncResult` and retain previous values during refresh.
-- Mutations expose waiting, success, and typed failure states.
-- Refresh dependent atoms after accepted mutations.
-- Mount long-lived stream atoms through React bindings.
-- Keep URL and browser-global access in client-only modules.
-
-A standalone `ManagedRuntime` is appropriate only for a real non-Atom frontend
-boundary. It is not required for AtomHttpApi's native client integration.
-
-### Atom module responsibilities
-
-A frontend atom module may own:
-
-- branded identity selection
-- URL-decoded state
-- query composition
-- mutation workflows
-- live event projection
-- optimistic or ephemeral streaming text
-- query invalidation
-- browser history synchronization
-
-```ts
-export const selectedUserId = Atom.make(Option.none<UserId>())
-
-export const selectedUser = Atom.make(get =>
-  Option.match(get(selectedUserId), {
-    onNone: () => Effect.succeed(Option.none<User>()),
-    onSome: id => get.result(ApiClient.user(id)).pipe(Effect.map(Option.some))
-  })
-)
-```
-
-Decode URL values through the shared schema before placing them in state.
-
-### React component responsibilities
-
-Components may:
-
-- use `useAtom`, `useAtomValue`, and `useAtomMount`
-- render `AsyncResult` waiting/failure/success states
-- derive presentation-only projections
-- write intent to state or mutation atoms
-- own imperative third-party UI handles when unavoidable
-
-Components should not:
-
-- construct HTTP clients
-- call fetch directly
-- launch effects
-- supervise streams
-- parse unvalidated server data
-- duplicate domain state in local React state
-
-Extract transport-independent views into pure components and test them with
-React Testing Library.
-
-### Server/client rendering boundary
-
-When using React Server Components, keep read-oriented initial shells on the
-server. Keep Effect Atom registry state, browser APIs, editors, graphs, SSE,
-conversation, and mutations in explicit client components. The shared HttpApi
-schemas and inferred client remain usable on both sides with the appropriate
-platform client layer.
-
-## AsyncResult UI handling
-
-Every asynchronous atom exposes an `AsyncResult`.
-
-- `Initial` means no resolved value yet.
-- `Success` contains a value and may still be `waiting` during refresh.
-- `Failure` contains a typed `Cause` and may preserve previous success.
-
-Do not collapse these states into unrelated booleans that can contradict one
-another. Render previous successful content while a refresh is waiting when
-that is less disruptive.
-
-Errors visible to users should have appropriate semantics such as `role="alert"`.
-Busy operations should expose `aria-busy` or a polite status and use specific
-labels such as `Saving…`, not merely disable a button without explanation.
 
 ## Testing
 
@@ -888,83 +593,19 @@ and the real production decoder.
 
 Sort fixture output and keep fixture constructors named by domain purpose.
 
-### Frontend component tests
-
-Use React Testing Library with Vitest and jsdom:
-
-```tsx
-// @vitest-environment jsdom
-
-import "@testing-library/jest-dom/vitest"
-import * as TestingLibrary from "@testing-library/react"
-import * as it from "@effect/vitest"
-import * as Effect from "effect/Effect"
-
-it.afterEach(TestingLibrary.cleanup)
-
-it.effect("selects a user", () =>
-  Effect.sync(() => {
-    const onSelect = it.vi.fn()
-    TestingLibrary.render(<UserList users={users} onSelect={onSelect} />)
-
-    TestingLibrary.fireEvent.click(
-      TestingLibrary.screen.getByRole("button", { name: /Ada/ })
-    )
-
-    it.expect(onSelect).toHaveBeenCalledExactlyOnceWith(users[0]?.id)
-  })
-)
-```
-
-Test user-visible semantics:
-
-- accessible roles and names
-- selected state
-- keyboard actions
-- formatted domain content
-- empty, busy, error, and success states
-- responsive or modal behavior where important
-
-Do not assert implementation details such as internal atom counters or CSS class
-names unless the class itself is the behavior under test.
-
 ### Vitest configuration
 
-Keep Vitest rooted at the repository even when Vite builds from `web/`:
+Keep Vitest rooted at the repository:
 
 ```ts
 import * as VitestConfig from "vitest/config"
 
 export default VitestConfig.defineConfig({
   test: {
-    include: ["test/**/*.test.ts", "web/**/*.test.tsx"]
+    include: ["test/**/*.test.ts"]
   }
 })
 ```
-
-A Vite `root: "web"` without a separate Vitest config can accidentally cause
-backend tests to disappear.
-
-## Vite configuration
-
-```ts
-import * as ReactPlugin from "@vitejs/plugin-react"
-import * as Vite from "vite"
-
-export default Vite.defineConfig({
-  root: "web",
-  plugins: [ReactPlugin.default()],
-  build: {
-    outDir: "../dist-web",
-    emptyOutDir: true
-  }
-})
-```
-
-Serve production assets from the Effect HTTP server when a same-origin local
-application is desired. Load assets through `FileSystem`, distinguish files from
-directories with `stat`, use explicit content types, and bind local development
-servers to `127.0.0.1` unless remote access is an explicit feature.
 
 ## Concurrency, commands, and external processes
 
@@ -991,8 +632,7 @@ servers to `127.0.0.1` unless remote access is an explicit feature.
 
 ## Documentation
 
-- Put client-facing descriptions on schemas so OpenAPI and generated tooling can
-  carry them.
+- Put descriptions on schemas so consumers and generated tooling can use them.
 - Use comments for private implementation rationale and invariant protection.
 - Document database schemas by explaining how records participate in the
   application, not by repeating column names.
@@ -1003,8 +643,6 @@ servers to `127.0.0.1` unless remote access is an explicit feature.
 Do not:
 
 - call `Effect.runPromise` throughout business logic
-- call `Effect.runFork` from React components
-- create a separate runtime around AtomHttpApi
 - expose raw SDK Promises from services
 - use `node:fs` in domain services
 - use unbranded strings for unrelated identities
@@ -1015,7 +653,6 @@ Do not:
 - parse error messages to decide recovery
 - make service consumers provide the service's private dependencies
 - create a new stateful layer on each call
-- repeat API request/response schemas on client and server
 - duplicate durable history in a coordination database
 - write tests against a developer's real workspace
 - disable strict compiler flags to silence design errors
@@ -1030,12 +667,9 @@ Before considering an Effect application change complete:
 3. Expected failures are tagged and typed.
 4. Service dependencies are captured in layers.
 5. Scopes and interruption clean up resources.
-6. Frontend effects live in atoms, not components.
-7. The shared API still infers both handlers and clients.
-8. Every new backend source module has a focused test module.
-9. Component behavior is tested through accessible UI.
-10. `tsc -b` passes without weakening strictness.
-11. Effect/Vitest tests pass.
-12. The production build passes.
-13. Generated files and runtime state are excluded from Git.
-14. Any intentional deviation from this guide is documented with its reason.
+6. Every new source module has a focused test module.
+7. `tsc -b` passes without weakening strictness.
+8. Effect/Vitest tests pass.
+9. The production build passes.
+10. Generated files and runtime state are excluded from Git.
+11. Any intentional deviation from this guide is documented with its reason.
