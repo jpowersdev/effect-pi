@@ -59,28 +59,39 @@ Declare reusable configuration recipes and layers at module scope. Compose them 
 ```ts
 import * as Config from "effect/Config"
 import * as Layer from "effect/Layer"
+
 import { LocalSessions, ModelRuntime, ResourceLoader } from "@jpowersdev/effect-pi"
 
 const ModelConfig = Config.all({
   provider: Config.NonEmptyString("EFFECT_PI_PROVIDER"),
   modelId: Config.NonEmptyString("EFFECT_PI_MODEL"),
   apiKey: Config.Redacted("EFFECT_PI_API_KEY")
-}).pipe(Config.map(({ provider, modelId, apiKey }) => ({
-  model: { provider, id: modelId },
-  apiKeys: { [provider]: apiKey },
-  authPath: ".data/auth.json",
-  modelsPath: null,
-  refreshOnCreate: false
-})))
+}).pipe(
+  Config.map(({ provider, modelId, apiKey }) => ({
+    model: { provider, id: modelId },
+    apiKeys: { [provider]: apiKey },
+    authPath: ".data/auth.json",
+    modelsPath: null,
+    refreshOnCreate: false
+  }))
+)
+
 const ResourcesLive = ResourceLoader.layerEmpty({
   systemPrompt: "You are a helpful assistant.",
   settings: { retry: { enabled: false } }
 })
-const ModelLive = ModelRuntime.layerConfig(ModelConfig).pipe(Layer.provide(ResourcesLive))
+
+const ModelLive = ModelRuntime.layerConfig(ModelConfig).pipe(
+  Layer.provide(ResourcesLive)
+)
+
 const SessionsLive = LocalSessions.layerConfig({
   cwd: Config.NonEmptyString("EFFECT_PI_CWD").pipe(Config.withDefault(".")),
   configure: Config.succeed(() => ({ tools: ["read", "grep", "find", "ls"] }))
-}).pipe(Layer.provide(ModelLive))
+}).pipe(
+  Layer.provide(ModelLive)
+)
+
 // Provide Node services and a KeyValueStore at the application boundary.
 ```
 
@@ -136,29 +147,45 @@ The [runnable examples](../examples/README.md) configure Pi explicitly without l
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
+
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+
 import { LocalSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "@jpowersdev/effect-pi"
 
 const SqlLive = SqliteClient.layer({ filename: ".data/effect-pi.sqlite" })
+
 const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(
   Layer.provide(SqlLive)
 )
-const ModelLive = ModelRuntime.layer().pipe(Layer.provide(ResourceLoader.layer()))
+
+const ModelLive = ModelRuntime.layer().pipe(
+  Layer.provide(ResourceLoader.layer())
+)
+
 const SessionsLive = LocalSessions.layer({
   cwd: process.cwd(),
   configure: () => ({ tools: ["read", "grep", "find", "ls"] })
-}).pipe(Layer.provide([ModelLive, NodeServices.layer, StoreLive]))
+}).pipe(
+  Layer.provide([ModelLive, NodeServices.layer, StoreLive])
+)
 
-const program = Effect.gen(function*() {
+const program = Effect.gen(function* () {
   const sessions = yield* Sessions
+
   const id = Session.Id.make("experiment-1")
+
   const session = yield* sessions.open(id)
+
   const result = yield* session.prompt("Describe the top-level files in this repository")
+
   yield* Console.log(result.text)
-}).pipe(Effect.scoped, Effect.provide(SessionsLive))
+}).pipe(
+  Effect.scoped,
+  Effect.provide(SessionsLive)
+)
 
 NodeRuntime.runMain(program)
 ```

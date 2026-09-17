@@ -12,6 +12,7 @@ import * as ResourceLoader from "./ResourceLoader.js"
 export interface Options extends Omit<Pi.CreateModelRuntimeOptions, "signal"> {
   /** Omit to let Pi restore/select the model using the session and settings. */
   readonly model?: { readonly provider: string; readonly id: string }
+
   /** Runtime-only overrides. Keys are never persisted to auth.json. */
   readonly apiKeys?: Readonly<Record<string, Redacted.Redacted<string>>>
 }
@@ -28,7 +29,9 @@ export interface Binding extends ResourceLoader.Loaded {
 }
 
 export interface Operations {
-  readonly sessionOptions: (cwd: string) => Effect.Effect<Binding, Error | ResourceLoader.Error, Scope.Scope>
+  readonly sessionOptions: (
+    cwd: string
+  ) => Effect.Effect<Binding, Error | ResourceLoader.Error, Scope.Scope>
 }
 
 export class ModelRuntime extends Context.Service<ModelRuntime, Operations>()(
@@ -38,10 +41,12 @@ export class ModelRuntime extends Context.Service<ModelRuntime, Operations>()(
 /** Capture the loading policy; SDK objects are owned by each live session's scope. */
 export const make = Effect.fn("ModelRuntime.make")(function* (options: Options = {}) {
   const resources = yield* ResourceLoader.ResourceLoader
+
   const { model: selection, apiKeys, ...runtimeOptions } = options
 
   const sessionOptions: Operations["sessionOptions"] = Effect.fn("ModelRuntime.sessionOptions")(function* (cwd) {
     const loaded = yield* resources.load(cwd)
+
     const modelRuntime = yield* Effect.tryPromise({
       try: (signal) => Pi.ModelRuntime.create({ ...runtimeOptions, signal }),
       // SDK credential errors can contain raw keys. Do not retain or stringify them.
@@ -53,34 +58,42 @@ export const make = Effect.fn("ModelRuntime.make")(function* (options: Options =
     yield* Effect.try({
       try: () => {
         const runtime = loaded.resourceLoader.getExtensions().runtime
+
         for (const { name, config } of runtime.pendingProviderRegistrations) {
           modelRuntime.registerProvider(name, config)
         }
+
         for (const { provider } of runtime.pendingNativeProviderRegistrations) {
           modelRuntime.registerNativeProvider(provider)
         }
       },
       catch: () => new Error({ operation: "providers", message: "Unable to register resource providers" })
     })
+
     for (const [provider, key] of Object.entries(apiKeys ?? {})) {
       yield* Effect.tryPromise({
         try: (signal) => modelRuntime.setRuntimeApiKey(provider, Redacted.value(key), { signal }),
         catch: () => new Error({ operation: "credentials", message: "Unable to configure runtime credentials" })
       })
     }
+
     if (selection === undefined) return { ...loaded, modelRuntime }
+
     const model = yield* Effect.try({
       try: () => modelRuntime.getModel(selection.provider, selection.id),
       catch: () => new Error({ operation: "model", message: "Unable to resolve the configured model" })
     })
+
     if (model === undefined) {
       return yield* new Error({
         operation: "model",
         message: `Unknown model ${selection.provider}/${selection.id}`
       })
     }
+
     return { ...loaded, modelRuntime, model }
   })
+
   return ModelRuntime.of({ sessionOptions })
 })
 

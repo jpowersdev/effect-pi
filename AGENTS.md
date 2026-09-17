@@ -4,6 +4,7 @@
 
 - Follow [`EFFECT.md`](EFFECT.md) for TypeScript and Effect implementation conventions.
 - Executable example entrypoints use `kebab-case.ts`; reusable library modules retain `PascalCase.ts`.
+- Let code breathe: separate definitions and logical steps with blank lines. Expand nested layer/config expressions with consistent indentation and one pipeline operation per line; favor readable visual structure over compactness.
 - Define reusable layers at module scope and compose them at application boundaries. Prefer `layerConfig` for `Config`-driven construction; use `Layer.unwrap` only when construction genuinely needs yielded values or services. Don't assemble the whole dependency graph inside the application Effect.
 - A local copy of the Effect v4 codebase is available at `.vendor/effect/`. Consult it when exact API behavior, types, implementation details, or examples are needed.
 - The Nix development environment checks that copy for upstream updates at most once every 24 hours.
