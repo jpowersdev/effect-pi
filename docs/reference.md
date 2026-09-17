@@ -1,6 +1,6 @@
 # API and behavior reference
 
-This guide describes the details behind the [README](../README.md). For runnable programs, see the [examples](../examples/README.md).
+This guide covers installation, configuration, the public API, persistence, and cancellation. See the [README](../README.md) for an overview and the [examples](../examples/README.md) for runnable programs.
 
 ## Installation and compatibility
 
