@@ -46,7 +46,7 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
-Follow the [example setup](examples/README.md#setup) to choose a model and configure credentials, then run:
+Follow the [example setup](examples/README.md#setup) to create the data directory and configure a model and credentials, then run:
 
 ```sh
 pnpm example:pool "Say hello in one sentence"

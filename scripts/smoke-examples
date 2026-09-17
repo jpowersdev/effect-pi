@@ -3,20 +3,20 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$project_root"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-export EFFECT_PI_DATA_DIR="$work/data"
+# Run the examples' fixed relative paths in a disposable working directory.
+cd "$work"
+umask 077
+mkdir -p .data/effect-pi
 export EFFECT_PI_PROVIDER=anthropic
 export EFFECT_PI_MODEL=claude-sonnet-4-5
 export EFFECT_PI_API_KEY=unused-snapshot-only
-export EFFECT_PI_RUNNER_PORT="${EFFECT_PI_RUNNER_PORT:-38479}"
-unset EFFECT_PI_SESSION_ID
 
 # Each program owns all of its resources, including both cluster runtimes.
 # A second cluster run checks that the first one released its listener.
 # timeout's kill-after is only a test harness safeguard.
 for example in single-session local-session-pool cluster-session cluster-session; do
-  timeout --kill-after=5s 30s node "dist-examples/$example.js" --snapshot
+  timeout --kill-after=5s 30s node "$project_root/dist-examples/$example.js" --snapshot
 done

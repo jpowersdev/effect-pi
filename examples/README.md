@@ -17,6 +17,13 @@ pnpm install --frozen-lockfile
 pnpm build
 ```
 
+Create the fixed data directory before running (Unix commands):
+
+```sh
+mkdir -p .data/effect-pi
+chmod 700 .data/effect-pi
+```
+
 Choose a model in Pi's built-in catalog and supply its API key. For example:
 
 ```sh
@@ -25,7 +32,9 @@ export EFFECT_PI_MODEL=claude-sonnet-4-5
 # Set EFFECT_PI_API_KEY through your shell or secret manager. Don't commit it.
 ```
 
-Each file declares its configuration recipes and layers at module scope. `ModelRuntime.layerConfig` depends on `ResourceLoader.layerEmpty`; session layers consume the model layer. The application Effect only opens sessions and does work. Config is resolved through `ConfigProvider` at layer build time, not when the module is imported. No Pi imports, custom SDK adapters, or `tryPromise` calls are needed. The supplied key is a runtime override rather than a saved credential, and your usual Pi extensions, skills, prompts, and context files aren't loaded. The enabled tools are `read`, `grep`, `find`, and `ls`.
+The layers are defined at module scope: resources feed the model runtime, which feeds sessions. Only the model and credentials come from configuration; incidental paths and settings are ordinary literals you can edit.
+
+There are no Pi imports or Promise adapters. Your API key is not saved, and your usual Pi extensions, skills, prompts, and context files aren't loaded. The enabled tools are `read`, `grep`, `find`, and `ls`.
 
 ## Run an example
 
@@ -43,7 +52,7 @@ node dist-examples/local-session-pool.js "Say hello in one sentence"
 node dist-examples/cluster-session.js "Say hello in one sentence"
 ```
 
-All three save conversations in SQLite. Run an example again with the same session id and data directory to continue its conversation. The pool example also reopens the session before exiting and prints its snapshot, showing how separate requests can use the same pool.
+All three save conversations in `.data/effect-pi/sessions.sqlite`. Run an example again from the same working directory to continue its conversation. The pool example also reopens the session before exiting and prints its snapshot, showing how separate requests can use the same pool.
 
 ### Try it without a model request
 
@@ -55,16 +64,11 @@ EFFECT_PI_API_KEY=unused-snapshot-only pnpm example:cluster --snapshot
 
 Keep the provider and model variables set. Normal prompt mode makes paid model calls and prints live events followed by the result.
 
-## Configuration
+## Defaults you can edit
 
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `EFFECT_PI_DATA_DIR` | `.data/effect-pi` | Directory containing `sessions.sqlite` and the example-specific auth path. |
-| `EFFECT_PI_CWD` | Current working directory | Working directory for Pi's tools. |
-| `EFFECT_PI_SESSION_ID` | `single-session`, `pooled-session`, or `cluster-session` | Conversation to create or restore. |
-| `EFFECT_PI_RUNNER_PORT` | `34431` | Loopback port used by the cluster example. |
+Paths, session ids, and the cluster port are fixed in the source. Tools work in `"."`; session ids are `single-session`, `pooled-session`, and `cluster-session`. The cluster runner listens on `127.0.0.1:34431`. Change those literals if your application needs something different.
 
-Use different session ids when running independent examples concurrently. They must not write to the same conversation at the same time.
+Independent owners must not write to the same session id in the same database concurrently.
 
 ## How the cluster example runs
 
@@ -76,8 +80,8 @@ This is a local demonstration. Running across machines requires a shared databas
 
 ## Safety and cancellation
 
-- Read-only tools are **not a sandbox**: they can read outside `EFFECT_PI_CWD`. Use trusted workspaces.
-- The data directory is created with mode `0700` on Unix, but existing permissions are not changed. Conversations and logs are not encrypted and may contain private data.
+- Read-only tools are **not a sandbox**: they can read outside the working directory. Use trusted workspaces.
+- Keep `.data/effect-pi` private (the setup command uses mode `0700` on Unix). Conversations and logs are not encrypted and may contain private data.
 - Live events are best-effort. A remote subscription can miss initial events; use the completed result or a snapshot to reconcile.
 - Prompts have a two-minute timeout. Cancellation and Ctrl+C still wait for Pi, its tools, and storage writes to settle. They do not undo file changes or model charges.
 
@@ -96,7 +100,7 @@ Use an ESM project (`"type": "module"`). Node 26 can run the copied TypeScript f
 node single-session.ts --snapshot
 ```
 
-Set the environment variables as described above. If you compile with TypeScript, use NodeNext and `skipLibCheck` for the pinned upstream declarations.
+Create `.data/effect-pi` and set the model/credential variables as described above. If you compile with TypeScript, use NodeNext and `skipLibCheck` for the pinned upstream declarations.
 
 The npm tarball includes the source and compiled examples too. With their optional dependencies installed, you can run one without copying it:
 
