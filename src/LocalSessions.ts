@@ -1,1 +1,1 @@
-export { layer, type Options } from "./internal/LocalSessions.js"
+export { layer, layerConfig, type Options } from "./internal/LocalSessions.js"

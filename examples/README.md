@@ -25,7 +25,7 @@ export EFFECT_PI_MODEL=claude-sonnet-4-5
 # Set EFFECT_PI_API_KEY through your shell or secret manager. Don't commit it.
 ```
 
-Each program composes `ResourceLoader.layerEmpty` into `ModelRuntime.layer`, then provides that to the session layer or constructor. No Pi imports, custom SDK adapters, or `tryPromise` calls are needed. The supplied key is a runtime override rather than a saved credential, and your usual Pi extensions, skills, prompts, and context files aren't loaded. The enabled tools are `read`, `grep`, `find`, and `ls`.
+Each file declares its configuration recipes and layers at module scope. `ModelRuntime.layerConfig` depends on `ResourceLoader.layerEmpty`; session layers consume the model layer. The application Effect only opens sessions and does work. Config is resolved through `ConfigProvider` at layer build time, not when the module is imported. No Pi imports, custom SDK adapters, or `tryPromise` calls are needed. The supplied key is a runtime override rather than a saved credential, and your usual Pi extensions, skills, prompts, and context files aren't loaded. The enabled tools are `read`, `grep`, `find`, and `ls`.
 
 ## Run an example
 

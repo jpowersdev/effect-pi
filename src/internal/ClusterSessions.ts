@@ -1,3 +1,4 @@
+import * as Config from "effect/Config"
 import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -86,6 +87,10 @@ export const runnerLayerWith = <R>(
 
 /** Registers the server-side cluster entity handlers. */
 export const runnerLayer = (options: Options) => runnerLayerWith(options, Pi.make)
+
+/** Resolve runner options using the active ConfigProvider at layer build time. */
+export const runnerLayerConfig = (options: Config.Wrap<Options>) =>
+  Layer.unwrap(Effect.map(Config.unwrap<Options>(options), runnerLayer))
 
 /** Implements Sessions using location-transparent Effect Cluster clients. */
 export const clientLayer: Layer.Layer<Sessions, never, Sharding.Sharding> = Layer.effect(

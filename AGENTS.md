@@ -4,6 +4,7 @@
 
 - Follow [`EFFECT.md`](EFFECT.md) for TypeScript and Effect implementation conventions.
 - Executable example entrypoints use `kebab-case.ts`; reusable library modules retain `PascalCase.ts`.
+- Define reusable layers at module scope and compose them at application boundaries. Prefer `layerConfig` for `Config`-driven construction; use `Layer.unwrap` only when construction genuinely needs yielded values or services. Don't assemble the whole dependency graph inside the application Effect.
 - A local copy of the Effect v4 codebase is available at `.vendor/effect/`. Consult it when exact API behavior, types, implementation details, or examples are needed.
 - The Nix development environment checks that copy for upstream updates at most once every 24 hours.
 - Treat `.vendor/effect/` as read-only reference material. Do not modify it, depend on it by local path, or add it to Git.

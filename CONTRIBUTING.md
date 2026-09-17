@@ -23,6 +23,7 @@ pnpm pack --pack-destination /tmp/effect-pi-pack
 - Do not persist model prompt RPCs without a real idempotency protocol.
 - Live events are bounded and ephemeral, not another durable conversation log.
 - Keep examples self-contained, even when that repeats setup. The cluster example owns both the runner and client in one process.
+- Define reusable layers at module scope. Use `layerConfig` for config-driven options and reserve `Layer.unwrap` for construction that needs yielded values/services. Keep application Effects focused on consuming services.
 
 See `AGENTS.md` and `EFFECT.md` for implementation guidance. Where the SDK offers no cancellation API, document the protected acquisition/cleanup boundary rather than pretending interruption can force it to stop.
 

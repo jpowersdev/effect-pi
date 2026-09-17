@@ -1,4 +1,5 @@
 import * as Pi from "@earendil-works/pi-coding-agent"
+import * as Config from "effect/Config"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -85,3 +86,7 @@ export const make = Effect.fn("ModelRuntime.make")(function* (options: Options =
 
 export const layer = (options: Options = {}): Layer.Layer<ModelRuntime, never, ResourceLoader.ResourceLoader> =>
   Layer.effect(ModelRuntime, make(options))
+
+/** Resolve configuration when the layer is built, using the active ConfigProvider. */
+export const layerConfig = (options: Config.Wrap<Options>) =>
+  Layer.unwrap(Effect.map(Config.unwrap<Options>(options), layer))

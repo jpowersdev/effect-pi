@@ -1,7 +1,9 @@
 export {
   Error,
   layer,
+  layerConfig,
   layerEmpty,
+  layerEmptyConfig,
   type EmptyOptions,
   type Loaded,
   type Operations,

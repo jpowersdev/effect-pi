@@ -1,4 +1,5 @@
 import * as Pi from "@earendil-works/pi-coding-agent"
+import * as Config from "effect/Config"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -74,6 +75,14 @@ export const layer = (options: Options = {}): Layer.Layer<ResourceLoader> => Lay
       resourceLoader: new Pi.DefaultResourceLoader({ ...loaderOptions, cwd, agentDir, settingsManager })
     }
   }))
+
+/** Resolve discovery options using the active ConfigProvider at layer build time. */
+export const layerConfig = (options: Config.Wrap<Options>) =>
+  Layer.unwrap(Effect.map(Config.unwrap<Options>(options), layer))
+
+/** Resolve isolated resource options using the active ConfigProvider at layer build time. */
+export const layerEmptyConfig = (options: Config.Wrap<EmptyOptions>) =>
+  Layer.unwrap(Effect.map(Config.unwrap<EmptyOptions>(options), layerEmpty))
 
 /** No filesystem discovery, extensions, context files, or ambient settings. */
 export const layerEmpty = (options: EmptyOptions = {}): Layer.Layer<ResourceLoader> => Layer.sync(ResourceLoader, () =>

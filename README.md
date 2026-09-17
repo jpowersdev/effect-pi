@@ -28,7 +28,7 @@ export const program = Effect.gen(function*() {
 
 Use the same id and storage to continue the conversation later. You can also listen to `session.events`, check progress with `session.snapshot`, or stop the current prompt with `session.abort`.
 
-Model and resource setup are Effect layers too: `ResourceLoader` feeds `ModelRuntime`, which sessions consume. The library handles Pi's asynchronous setup and errors—you don't need to write Promise adapters.
+Model and resource setup are Effect layers too: `ResourceLoader` feeds `ModelRuntime`, which sessions consume. Define and compose them at module scope; `layerConfig` reads configuration when they're built. The library handles Pi's asynchronous setup and errors—you don't need to write Promise adapters.
 
 The [complete local example](examples/local-session-pool.ts) shows how to provide these layers and storage around this code.
 

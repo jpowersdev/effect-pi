@@ -35,12 +35,12 @@ Six concepts are exported from the package root:
 
 | Export | Purpose |
 | --- | --- |
-| `ResourceLoader` | Resource-loading service, `layer(options)` for Pi discovery, and `layerEmpty(options)` for isolation |
-| `ModelRuntime` | Runtime-configuration service; `layer(options)` depends on `ResourceLoader` |
+| `ResourceLoader` | `layer` / `layerConfig` for Pi discovery; `layerEmpty` / `layerEmptyConfig` for isolation |
+| `ModelRuntime` | `layer` / `layerConfig`, depending on `ResourceLoader` |
 | `Session` | Id/event/result schemas, `Session.Error`, the session interface, and scoped `Session.make` |
 | `Sessions` | Service providing `open(id)` within a scope |
-| `LocalSessions` | `layer(config)` backed by `RcMap` |
-| `ClusterSessions` | `runnerLayer(config)` and `clientLayer` |
+| `LocalSessions` | `layer` / `layerConfig`, backed by `RcMap` |
+| `ClusterSessions` | `runnerLayer` / `runnerLayerConfig`, and `clientLayer` |
 
 A session provides:
 
@@ -54,28 +54,39 @@ A session provides:
 
 ### Resources and models
 
-Compose the dependencies explicitly:
+Declare reusable configuration recipes and layers at module scope. Compose them at the application boundary, rather than building the graph inside the application Effect:
 
 ```ts
+import * as Config from "effect/Config"
 import * as Layer from "effect/Layer"
 import { LocalSessions, ModelRuntime, ResourceLoader } from "@jpowersdev/effect-pi"
 
+const ModelConfig = Config.all({
+  provider: Config.NonEmptyString("EFFECT_PI_PROVIDER"),
+  modelId: Config.NonEmptyString("EFFECT_PI_MODEL"),
+  apiKey: Config.Redacted("EFFECT_PI_API_KEY")
+}).pipe(Config.map(({ provider, modelId, apiKey }) => ({
+  model: { provider, id: modelId },
+  apiKeys: { [provider]: apiKey },
+  authPath: ".data/auth.json",
+  modelsPath: null,
+  refreshOnCreate: false
+})))
 const ResourcesLive = ResourceLoader.layerEmpty({
   systemPrompt: "You are a helpful assistant.",
   settings: { retry: { enabled: false } }
 })
-const ModelLive = ModelRuntime.layer({
-  model: { provider: "anthropic", id: "claude-sonnet-4-5" },
-  authPath: ".data/auth.json",
-  modelsPath: null,
-  refreshOnCreate: false
-}).pipe(Layer.provide(ResourcesLive))
-const SessionsLive = LocalSessions.layer({
-  cwd: process.cwd(),
-  configure: () => ({ tools: ["read", "grep", "find", "ls"] })
+const ModelLive = ModelRuntime.layerConfig(ModelConfig).pipe(Layer.provide(ResourcesLive))
+const SessionsLive = LocalSessions.layerConfig({
+  cwd: Config.NonEmptyString("EFFECT_PI_CWD").pipe(Config.withDefault(".")),
+  configure: Config.succeed(() => ({ tools: ["read", "grep", "find", "ls"] }))
 }).pipe(Layer.provide(ModelLive))
 // Provide Node services and a KeyValueStore at the application boundary.
 ```
+
+The config constructors accept `Config.Wrap<Options>`: either a complete `Config<Options>` or a nested record of individual `Config` values. Use `Config.succeed` for constant fields and callbacks, or use the plain `layer` constructors when all options are already known. Config is parsed **when the layer builds**, using the active `ConfigProvider`, so the same layer definition can be composed with different providers. Missing or invalid config fails the layer with `Config.ConfigError`, before sessions are opened.
+
+For genuinely effectful construction that needs other services, `Layer.unwrap` remains available. Keep such work at the relevant layer boundary; the application Effect should consume services, not assemble them.
 
 Supply runtime-only keys with `apiKeys: { [provider]: apiKey }`, where `apiKey` is an Effect `Redacted<string>` (for example, from `Config.Redacted`). The library installs these keys without persisting them; Pi may still create an empty auth file. Other model options follow Pi's `CreateModelRuntimeOptions`, except that the library supplies the cancellation signal. Omitting `model` lets Pi restore/select it from session history and settings.
 

@@ -1,3 +1,4 @@
+import * as Config from "effect/Config"
 import type * as Duration from "effect/Duration"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -38,3 +39,7 @@ export const layerWith = <R>(
 }))
 
 export const layer = (options: Options) => layerWith(options, Pi.make)
+
+/** Resolve pool options using the active ConfigProvider at layer build time. */
+export const layerConfig = (options: Config.Wrap<Options>) =>
+  Layer.unwrap(Effect.map(Config.unwrap<Options>(options), layer))
