@@ -10,6 +10,9 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Stream from "effect/Stream"
+import * as Argument from "effect/unstable/cli/Argument"
+import * as Command from "effect/unstable/cli/Command"
+import * as Flag from "effect/unstable/cli/Flag"
 import * as MessageStorage from "effect/unstable/cluster/MessageStorage"
 import * as RunnerAddress from "effect/unstable/cluster/RunnerAddress"
 import * as RunnerStorage from "effect/unstable/cluster/RunnerStorage"
@@ -42,12 +45,10 @@ const ModelLive = ModelRuntime.layerConfig(
   Layer.provide(ResourcesLive)
 )
 
-const SqlLive = SqliteClient.layer({
-  filename: ".data/effect-pi/sessions.sqlite"
-})
-
 const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(
-  Layer.provide(SqlLive)
+  Layer.provide(
+    SqliteClient.layer({ filename: ".data/effect-pi/sessions.sqlite" })
+  )
 )
 
 // Both runtimes share in-memory discovery; only conversation documents use SQLite.
@@ -87,34 +88,44 @@ const RunnerLive = ClusterSessions.runnerLayer({
 const ClientLive = ClusterSessions.clientLayer.pipe(
   Layer.provide(ClientSharding),
   // Register the runner first and keep it alive until the client exits.
-  Layer.provide(RunnerLive),
-  Layer.provide(NodeServices.layer)
+  Layer.provide(RunnerLive)
 )
 
-const program = Effect.gen(function* () {
-  const sessions = yield* Sessions
-
-  const session = yield* sessions.open(Session.Id.make("cluster-session"))
-
-  if (process.argv[2] === "--snapshot") {
-    return yield* Console.log(yield* session.snapshot)
-  }
-
-  // Remote subscriptions are best-effort; use the prompt result to reconcile.
-  yield* session.events.pipe(
-    Stream.runForEach((event) => Console.log(event)),
-    Effect.catch((error) => Console.warn(error)),
-    Effect.forkScoped({ startImmediately: true })
+const cli = Command.make("cluster-session", {
+  prompt: Argument.String("prompt").pipe(
+    Argument.withDefault("Say hello in one short sentence.")
+  ),
+  snapshot: Flag.Boolean("snapshot").pipe(
+    Flag.withDefault(false),
+    Flag.withDescription("Print saved state without calling a model")
   )
+}, ({ prompt, snapshot }) =>
+  Effect.gen(function* () {
+    const sessions = yield* Sessions
 
-  const text = process.argv.slice(2).join(" ") || "Say hello in one short sentence."
+    const session = yield* sessions.open(Session.Id.make("cluster-session"))
 
-  const result = yield* session.prompt(text).pipe(Effect.timeout("2 minutes"))
+    if (snapshot) {
+      return yield* Console.log(yield* session.snapshot)
+    }
 
-  yield* Console.log("Result:", result)
-}).pipe(
-  Effect.scoped,
-  Effect.provide(ClientLive)
+    // Remote subscriptions are best-effort; use the prompt result to reconcile.
+    yield* session.events.pipe(
+      Stream.runForEach((event) => Console.log(event)),
+      Effect.catch((error) => Console.warn(error)),
+      Effect.forkScoped({ startImmediately: true })
+    )
+
+    const result = yield* session.prompt(prompt).pipe(Effect.timeout("2 minutes"))
+
+    yield* Console.log("Result:", result)
+  }).pipe(Effect.scoped)
+).pipe(
+  Command.provide(ClientLive)
+)
+
+const program = Command.run(cli, { version: "0.1.0" }).pipe(
+  Effect.provide(NodeServices.layer)
 )
 
 NodeRuntime.runMain(program)

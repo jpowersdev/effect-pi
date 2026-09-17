@@ -4,6 +4,7 @@
 
 - Follow [`EFFECT.md`](EFFECT.md) for TypeScript and Effect implementation conventions.
 - Executable example entrypoints use `kebab-case.ts`; reusable library modules retain `PascalCase.ts`.
+- Inline simple layers used only once rather than naming every intermediate dependency. If examples accept CLI arguments, use Effect CLI (currently `effect/unstable/cli`), not hand-written `process.argv` parsing; otherwise use fixed defaults.
 - Keep examples focused on the library's core concepts. Use editable literals for incidental paths, ids, ports, and settings rather than general-purpose config plumbing. Use configuration where it adds real value, such as model credentials. Keep potentially throwing operations out of pure config transformations.
 - Let code breathe: separate definitions and logical steps with blank lines. Expand nested layer/config expressions with consistent indentation and one pipeline operation per line; favor readable visual structure over compactness.
 - Define reusable layers at module scope and compose them at application boundaries. Prefer `layerConfig` for `Config`-driven construction; use `Layer.unwrap` only when construction genuinely needs yielded values or services. Don't assemble the whole dependency graph inside the application Effect.

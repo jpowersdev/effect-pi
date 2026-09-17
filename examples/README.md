@@ -38,6 +38,8 @@ There are no Pi imports or Promise adapters. Your API key is not saved, and your
 
 ## Run an example
 
+Effect CLI handles the optional prompt, `--snapshot`, and `--help`. With no prompt argument, the default is “Say hello in one short sentence.” Quote prompts containing spaces. `--help` needs neither credentials nor the data directory.
+
 ```sh
 pnpm example:session "Say hello in one sentence"
 pnpm example:pool "Say hello in one sentence"

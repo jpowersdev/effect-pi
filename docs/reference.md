@@ -155,10 +155,10 @@ import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 
 import { LocalSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "@jpowersdev/effect-pi"
 
-const SqlLive = SqliteClient.layer({ filename: ".data/effect-pi.sqlite" })
-
 const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(
-  Layer.provide(SqlLive)
+  Layer.provide(
+    SqliteClient.layer({ filename: ".data/effect-pi.sqlite" })
+  )
 )
 
 const ModelLive = ModelRuntime.layer().pipe(

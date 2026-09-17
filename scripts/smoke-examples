@@ -9,7 +9,27 @@ trap 'rm -rf "$work"' EXIT
 # Run the examples' fixed relative paths in a disposable working directory.
 cd "$work"
 umask 077
+
+# Parsing/help must not build application layers or require credentials/storage.
+unset EFFECT_PI_PROVIDER EFFECT_PI_MODEL EFFECT_PI_API_KEY
+for example in single-session local-session-pool cluster-session; do
+  entry="$project_root/dist-examples/$example.js"
+  timeout --kill-after=5s 30s node "$entry" --help > "$work/help.log"
+  grep -q -- '--snapshot' "$work/help.log"
+
+  if timeout --kill-after=5s 30s node "$entry" --not-an-option > "$work/error.log" 2>&1; then
+    echo "$example accepted an unknown flag" >&2
+    exit 1
+  else
+    status=$?
+    test "$status" -eq 1
+    grep -q -- '--not-an-option' "$work/error.log"
+  fi
+done
+test ! -e .data
+
 mkdir -p .data/effect-pi
+
 export EFFECT_PI_PROVIDER=anthropic
 export EFFECT_PI_MODEL=claude-sonnet-4-5
 export EFFECT_PI_API_KEY=unused-snapshot-only
@@ -19,4 +39,5 @@ export EFFECT_PI_API_KEY=unused-snapshot-only
 # timeout's kill-after is only a test harness safeguard.
 for example in single-session local-session-pool cluster-session cluster-session; do
   timeout --kill-after=5s 30s node "$project_root/dist-examples/$example.js" --snapshot
+  timeout --kill-after=5s 30s node "$project_root/dist-examples/$example.js" "Do not send this prompt" --snapshot
 done

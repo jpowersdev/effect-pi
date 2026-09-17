@@ -8,6 +8,9 @@ import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Stream from "effect/Stream"
+import * as Argument from "effect/unstable/cli/Argument"
+import * as Command from "effect/unstable/cli/Command"
+import * as Flag from "effect/unstable/cli/Flag"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 
 import { ModelRuntime, ResourceLoader, Session } from "@jpowersdev/effect-pi"
@@ -35,44 +38,48 @@ const ModelLive = ModelRuntime.layerConfig(
   Layer.provide(ResourcesLive)
 )
 
-const SqlLive = SqliteClient.layer({
-  filename: ".data/effect-pi/sessions.sqlite"
-})
-
 const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(
-  Layer.provide(SqlLive)
-)
-
-// Session.make itself also needs Node services, so retain them in the output.
-const AppLive = Layer.merge(ModelLive, StoreLive).pipe(
-  Layer.provideMerge(NodeServices.layer)
-)
-
-const program = Effect.gen(function* () {
-  const session = yield* Session.make({
-    id: Session.Id.make("single-session"),
-    cwd: ".",
-    configure: () => ({ tools: ["read", "grep", "find", "ls"] })
-  })
-
-  if (process.argv[2] === "--snapshot") {
-    return yield* Console.log(yield* session.snapshot)
-  }
-
-  yield* session.events.pipe(
-    Stream.runForEach((event) => Console.log(event)),
-    Effect.catch((error) => Console.warn(error)),
-    Effect.forkScoped({ startImmediately: true })
+  Layer.provide(
+    SqliteClient.layer({ filename: ".data/effect-pi/sessions.sqlite" })
   )
+)
 
-  const text = process.argv.slice(2).join(" ") || "Say hello in one short sentence."
+const cli = Command.make("single-session", {
+  prompt: Argument.String("prompt").pipe(
+    Argument.withDefault("Say hello in one short sentence.")
+  ),
+  snapshot: Flag.Boolean("snapshot").pipe(
+    Flag.withDefault(false),
+    Flag.withDescription("Print saved state without calling a model")
+  )
+}, ({ prompt, snapshot }) =>
+  Effect.gen(function* () {
+    const session = yield* Session.make({
+      id: Session.Id.make("single-session"),
+      cwd: ".",
+      configure: () => ({ tools: ["read", "grep", "find", "ls"] })
+    })
 
-  const result = yield* session.prompt(text).pipe(Effect.timeout("2 minutes"))
+    if (snapshot) {
+      return yield* Console.log(yield* session.snapshot)
+    }
 
-  yield* Console.log("Result:", result)
-}).pipe(
-  Effect.scoped,
-  Effect.provide(AppLive)
+    yield* session.events.pipe(
+      Stream.runForEach((event) => Console.log(event)),
+      Effect.catch((error) => Console.warn(error)),
+      Effect.forkScoped({ startImmediately: true })
+    )
+
+    const result = yield* session.prompt(prompt).pipe(Effect.timeout("2 minutes"))
+
+    yield* Console.log("Result:", result)
+  }).pipe(Effect.scoped)
+).pipe(
+  Command.provide(Layer.merge(ModelLive, StoreLive))
+)
+
+const program = Command.run(cli, { version: "0.1.0" }).pipe(
+  Effect.provide(NodeServices.layer)
 )
 
 NodeRuntime.runMain(program)
