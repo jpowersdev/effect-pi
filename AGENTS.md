@@ -12,7 +12,8 @@
 ## Project architecture
 
 - This package is a reusable library, not an application executable. Keep public exports under `src/index.ts` and verify changes with `pnpm pack`.
-- Keep the public API limited to `Session`, `Sessions`, `LocalSessions`, and `ClusterSessions`; implementation details belong under `src/internal/`.
+- Public concepts are `ResourceLoader`, `ModelRuntime`, `Session`, `Sessions`, `LocalSessions`, and `ClusterSessions`; implementation details belong under `src/internal/`.
+- `ModelRuntime` depends on `ResourceLoader`. Reuse their layers, but allocate mutable SDK runtimes, resource loaders, and settings per live session. Keep Promise adapters inside the library, not in examples.
 - `Session.make` is the cluster-independent scoped constructor. `LocalSessions` shares sessions with `RcMap`; `ClusterSessions` is an optional ownership and transport adapter.
 - The configured `KeyValueStore` is the authoritative durable store for Pi JSONL. Pi's `SessionManager` remains authoritative for the JSONL format, migrations, and conversation-tree behavior.
 - Prompts for one live session must be serialized, while aborts and event subscriptions must remain concurrent with a running prompt.

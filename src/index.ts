@@ -1,4 +1,6 @@
 export * as ClusterSessions from "./ClusterSessions.js"
 export * as LocalSessions from "./LocalSessions.js"
+export * as ModelRuntime from "./ModelRuntime.js"
+export * as ResourceLoader from "./ResourceLoader.js"
 export * as Session from "./Session.js"
 export { Sessions } from "./Sessions.js"

@@ -89,7 +89,10 @@ export interface Session {
   readonly jsonl: Effect.Effect<string, Error>
 }
 
-export type PiOptions = Omit<Pi.CreateAgentSessionOptions, "cwd" | "sessionManager">
+export type PiOptions = Omit<
+  Pi.CreateAgentSessionOptions,
+  "cwd" | "sessionManager" | "modelRuntime" | "model" | "resourceLoader" | "settingsManager"
+>
 
 /** Configuration shared by direct, local-pool, and cluster session construction. */
 export interface Config {
@@ -97,7 +100,7 @@ export interface Config {
   readonly cwd: string
   /** Defaults to "effect-pi/sessions/". Keep stable across all owners of a document. */
   readonly keyPrefix?: string
-  /** Called per live resource. When omitted, Pi's ambient model/auth/resource defaults apply. */
+  /** Per-session SDK options (such as tools). ModelRuntime owns model, auth, resources, and settings. */
   readonly configure?: (sessionId: Id) => PiOptions
 }
 

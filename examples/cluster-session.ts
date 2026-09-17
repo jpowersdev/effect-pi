@@ -1,5 +1,4 @@
 /** Start a runner and a separate cluster client in one process, then shut both down. */
-import * as Pi from "@earendil-works/pi-coding-agent"
 import * as NodeClusterSocket from "@effect/platform-node/NodeClusterSocket"
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeServices from "@effect/platform-node/NodeServices"
@@ -11,8 +10,6 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as Redacted from "effect/Redacted"
-import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as MessageStorage from "effect/unstable/cluster/MessageStorage"
 import * as RunnerAddress from "effect/unstable/cluster/RunnerAddress"
@@ -20,29 +17,7 @@ import * as RunnerStorage from "effect/unstable/cluster/RunnerStorage"
 import * as ShardingConfig from "effect/unstable/cluster/ShardingConfig"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 
-import { ClusterSessions, Session, Sessions } from "@jpowersdev/effect-pi"
-
-class ExampleError extends Schema.TaggedError<ExampleError>()("ExampleError", {
-  message: Schema.String
-}) {}
-
-// Configuration belongs to the runner. Nothing is discovered from the workspace.
-const resources = (): Pi.ResourceLoader => {
-  const extensions = { extensions: [], errors: [], runtime: Pi.createExtensionRuntime() }
-  return {
-    getExtensions: () => extensions,
-    getSkills: () => ({ skills: [], diagnostics: [] }),
-    getPrompts: () => ({ prompts: [], diagnostics: [] }),
-    getThemes: () => ({ themes: [], diagnostics: [] }),
-    getAgentsFiles: () => ({ agentsFiles: [] }),
-    getSystemPrompt: () => "You are a helpful assistant. Use the read-only tools only when asked to inspect files.",
-    getSystemPromptSource: () => undefined,
-    getAppendSystemPrompt: () => [],
-    getAppendSystemPromptSources: () => [],
-    extendResources: () => {},
-    reload: async () => {}
-  }
-}
+import { ClusterSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "@jpowersdev/effect-pi"
 
 const program = Effect.gen(function*() {
   const fs = yield* FileSystem.FileSystem
@@ -60,23 +35,18 @@ const program = Effect.gen(function*() {
   const modelId = yield* Config.NonEmptyString("EFFECT_PI_MODEL")
   const apiKey = yield* Config.Redacted("EFFECT_PI_API_KEY")
 
-  const modelRuntime = yield* Effect.tryPromise({
-    try: (signal) => Pi.ModelRuntime.create({
-      authPath: path.join(directory, "auth.json"),
-      modelsPath: null,
-      refreshOnCreate: false,
-      signal
-    }),
-    catch: (cause) => new ExampleError({ message: String(cause) })
+  // Model and resource configuration belongs to the runner, not the cluster client.
+  const ResourcesLive = ResourceLoader.layerEmpty({
+    systemPrompt: "You are a helpful assistant. Use the read-only tools only when asked to inspect files.",
+    settings: { retry: { enabled: false } }
   })
-  const model = modelRuntime.getModel(provider, modelId)
-  if (model === undefined) {
-    return yield* new ExampleError({ message: `Unknown model ${provider}/${modelId}` })
-  }
-  yield* Effect.tryPromise({
-    try: (signal) => modelRuntime.setRuntimeApiKey(provider, Redacted.value(apiKey), { signal }),
-    catch: (cause) => new ExampleError({ message: String(cause) })
-  })
+  const ModelLive = ModelRuntime.layer({
+    model: { provider, id: modelId },
+    apiKeys: { [provider]: apiKey },
+    authPath: path.join(directory, "auth.json"),
+    modelsPath: null,
+    refreshOnCreate: false
+  }).pipe(Layer.provide(ResourcesLive))
 
   const SqlLive = SqliteClient.layer({ filename: path.join(directory, "sessions.sqlite") })
   const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(Layer.provide(SqlLive))
@@ -103,14 +73,8 @@ const program = Effect.gen(function*() {
 
   const RunnerLive = ClusterSessions.runnerLayer({
     cwd,
-    configure: () => ({
-      modelRuntime,
-      model,
-      tools: ["read", "grep", "find", "ls"],
-      settingsManager: Pi.SettingsManager.inMemory({ retry: { enabled: false } }),
-      resourceLoader: resources()
-    })
-  }).pipe(Layer.provide([StoreLive, RunnerSharding]))
+    configure: () => ({ tools: ["read", "grep", "find", "ls"] })
+  }).pipe(Layer.provide([ModelLive, StoreLive, RunnerSharding]))
   const ClientLive = ClusterSessions.clientLayer.pipe(
     Layer.provide(ClientSharding),
     // Build/register the runner first and keep it alive until the client exits.

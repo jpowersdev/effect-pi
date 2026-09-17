@@ -15,7 +15,8 @@ pnpm pack --pack-destination /tmp/effect-pi-pack
 
 ## Design boundaries
 
-- Keep public exports under `src/index.ts`: `Session`, `Sessions`, `LocalSessions`, `ClusterSessions`.
+- Keep public exports under `src/index.ts`: `ResourceLoader`, `ModelRuntime`, `Session`, `Sessions`, `LocalSessions`, `ClusterSessions`.
+- `ModelRuntime` captures `ResourceLoader`. Reuse configuration layers while allocating mutable SDK bindings per live session; keep Promise adapters inside the library.
 - Pi owns JSONL formats/migrations/tree semantics. The configured `KeyValueStore` owns the durable document.
 - One live session serializes prompts; cancellation, snapshots, and event subscriptions must remain concurrent.
 - Prompt cancellation must settle the underlying SDK operation before the gate or resource is released.

@@ -12,6 +12,7 @@ import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
 import type * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 
+import * as ModelRuntime from "./ModelRuntime.js"
 import * as Persistence from "./Persistence.js"
 import * as Session from "./Session.js"
 
@@ -82,7 +83,8 @@ const snapshot = (id: Session.Id, session: SdkSession): Session.Snapshot => {
 /** Internal constructor seam; all lifecycle and persistence behavior is shared with make. */
 export const makeWith = Effect.fn("Session.make")(function* (
   options: Session.MakeOptions,
-  createSession: CreateSession
+  createSession: CreateSession,
+  prepare?: ModelRuntime.Operations["sessionOptions"]
 ) {
   const id = options.id
   const fs = yield* FileSystem.FileSystem
@@ -126,11 +128,14 @@ export const makeWith = Effect.fn("Session.make")(function* (
     try: () => options.configure?.(id) ?? {},
     catch: (cause) => sessionError(id, "make", cause)
   })
+  const runtimeOptions = prepare === undefined ? {} : yield* prepare(options.cwd).pipe(
+    Effect.mapError((cause) => sessionError(id, "make", cause))
+  )
   // Pi's factory has no cancellation API. Wait for acquisition before honoring
   // interruption, so even a late result is disposed before its temp directory.
   const result = yield* Effect.acquireRelease(
     Effect.tryPromise({
-      try: () => createSession({ ...piOptions, cwd: options.cwd, sessionManager: manager }),
+      try: () => createSession({ ...piOptions, ...runtimeOptions, cwd: options.cwd, sessionManager: manager }),
       catch: (cause) => sessionError(id, "make", cause)
     }),
     (result) => Effect.try({
@@ -336,5 +341,6 @@ export const make: (
 ) => Effect.Effect<
   Session.Session,
   Session.Error,
-  FileSystem.FileSystem | KeyValueStore.KeyValueStore | Path.Path | Scope.Scope
-> = (options) => makeWith(options, Pi.createAgentSession)
+  FileSystem.FileSystem | KeyValueStore.KeyValueStore | Path.Path | Scope.Scope | ModelRuntime.ModelRuntime
+> = (options) => Effect.flatMap(ModelRuntime.ModelRuntime, (runtime) =>
+  makeWith(options, Pi.createAgentSession, runtime.sessionOptions))

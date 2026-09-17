@@ -25,7 +25,7 @@ export EFFECT_PI_MODEL=claude-sonnet-4-5
 # Set EFFECT_PI_API_KEY through your shell or secret manager. Don't commit it.
 ```
 
-Each program configures Pi explicitly. It uses the supplied key as a runtime override rather than saving it, and doesn't load your usual Pi extensions, skills, prompts, or context files. The enabled tools are `read`, `grep`, `find`, and `ls`.
+Each program composes `ResourceLoader.layerEmpty` into `ModelRuntime.layer`, then provides that to the session layer or constructor. No Pi imports, custom SDK adapters, or `tryPromise` calls are needed. The supplied key is a runtime override rather than a saved credential, and your usual Pi extensions, skills, prompts, and context files aren't loaded. The enabled tools are `read`, `grep`, `find`, and `ls`.
 
 ## Run an example
 
@@ -86,7 +86,7 @@ This is a local demonstration. Running across machines requires a shared databas
 Install `@jpowersdev/effect-pi` using a [local tarball or published release](../docs/reference.md#installation-and-compatibility), then add the packages imported by the example:
 
 ```sh
-pnpm add effect@4.0.0-rc.115 @earendil-works/pi-coding-agent@0.84.4 \
+pnpm add effect@4.0.0-rc.115 \
   @effect/platform-node@4.0.0-rc.115 @effect/sql-sqlite-node@4.0.0-rc.115
 ```
 

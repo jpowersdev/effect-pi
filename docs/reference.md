@@ -21,7 +21,7 @@ For a published release, use the package name in place of the tarball path.
 
 The supported configuration is Node.js 26+, ESM, Effect `4.0.0-rc.115`, and Pi `0.84.4`. Effect is an exact peer dependency while these APIs are release candidates. Keep all `@effect/*` packages on the matching release.
 
-The Pi SDK is an exact runtime dependency. Add `@earendil-works/pi-coding-agent@0.84.4` directly if you import it to configure sessions. The optional Node/SQLite example dependencies are:
+The Pi SDK is an exact runtime dependency. Normal usage and the examples don't import it directly. Add `@earendil-works/pi-coding-agent@0.84.4` only for advanced SDK interoperability. The optional Node/SQLite example dependencies are:
 
 ```sh
 pnpm add @effect/platform-node@4.0.0-rc.115 @effect/sql-sqlite-node@4.0.0-rc.115
@@ -31,10 +31,12 @@ TypeScript consumers currently need `skipLibCheck: true` because the pinned upst
 
 ## Public API
 
-Four concepts are exported from the package root:
+Six concepts are exported from the package root:
 
 | Export | Purpose |
 | --- | --- |
+| `ResourceLoader` | Resource-loading service, `layer(options)` for Pi discovery, and `layerEmpty(options)` for isolation |
+| `ModelRuntime` | Runtime-configuration service; `layer(options)` depends on `ResourceLoader` |
 | `Session` | Id/event/result schemas, `Session.Error`, the session interface, and scoped `Session.make` |
 | `Sessions` | Service providing `open(id)` within a scope |
 | `LocalSessions` | `layer(config)` backed by `RcMap` |
@@ -48,11 +50,44 @@ A session provides:
 - `events` — ephemeral status, text-delta, and tool lifecycle events.
 - `jsonl` — serialize current state. This is **not** a store flush operation.
 
-`configure(id)` synchronously returns Pi SDK options, except `cwd` and `sessionManager`, which the library owns. Prepare asynchronous dependencies such as `ModelRuntime` before constructing the layer. SDK options are version-coupled, not an independent stable abstraction.
+`configure(id)` synchronously returns per-session SDK options such as tool policy and thinking level. The library owns `cwd`, `sessionManager`, `modelRuntime`, `model`, `resourceLoader`, and `settingsManager`. SDK interoperability options remain version-coupled.
+
+### Resources and models
+
+Compose the dependencies explicitly:
+
+```ts
+import * as Layer from "effect/Layer"
+import { LocalSessions, ModelRuntime, ResourceLoader } from "@jpowersdev/effect-pi"
+
+const ResourcesLive = ResourceLoader.layerEmpty({
+  systemPrompt: "You are a helpful assistant.",
+  settings: { retry: { enabled: false } }
+})
+const ModelLive = ModelRuntime.layer({
+  model: { provider: "anthropic", id: "claude-sonnet-4-5" },
+  authPath: ".data/auth.json",
+  modelsPath: null,
+  refreshOnCreate: false
+}).pipe(Layer.provide(ResourcesLive))
+const SessionsLive = LocalSessions.layer({
+  cwd: process.cwd(),
+  configure: () => ({ tools: ["read", "grep", "find", "ls"] })
+}).pipe(Layer.provide(ModelLive))
+// Provide Node services and a KeyValueStore at the application boundary.
+```
+
+Supply runtime-only keys with `apiKeys: { [provider]: apiKey }`, where `apiKey` is an Effect `Redacted<string>` (for example, from `Config.Redacted`). The library installs these keys without persisting them; Pi may still create an empty auth file. Other model options follow Pi's `CreateModelRuntimeOptions`, except that the library supplies the cancellation signal. Omitting `model` lets Pi restore/select it from session history and settings.
+
+`ResourceLoader.layerEmpty` does no filesystem discovery and uses in-memory settings. `ResourceLoader.layer` opts into trusted Pi discovery, defaulting to Pi's agent directory; `agentDir` overrides the resource directory, and `settings` replaces discovered settings with an in-memory configuration. Configure model/auth paths separately on `ModelRuntime` when using a custom directory.
+
+These services capture reusable configuration, **not shared mutable SDK instances**. The `ResourceLoader` service's `load(cwd)` and the `ModelRuntime` service's `sessionOptions(cwd)` are scoped Effects; sessions call them automatically. Each live session receives a fresh resource loader, settings manager, and model runtime. Extension-provided models are registered before model selection. Reusing a layer does not share extension bindings or runtime credentials between live sessions.
+
+Direct service calls fail with `ResourceLoader.Error` or `ModelRuntime.Error`, each carrying `operation` and `message`. Session construction maps these to `Session.Error` with operation `make`. Raw SDK error payloads are not retained because they can contain credentials. Loaded/binding values expose SDK handles only as an advanced interoperability boundary; don't share them between live sessions or use them after their scope closes.
 
 ### Direct sessions
 
-`Session.make({ id, cwd, configure? })` needs `FileSystem`, `Path`, `KeyValueStore`, and a `Scope`. It does not require `Sessions` or Cluster. Each call creates its own resource; do not independently construct the same stored id twice.
+`Session.make({ id, cwd, configure? })` needs `ModelRuntime`, `FileSystem`, `Path`, `KeyValueStore`, and a `Scope`. It does not require `Sessions` or Cluster. Each call creates its own resource; do not independently construct the same stored id twice.
 
 See [single-session.ts](../examples/single-session.ts).
 
@@ -66,7 +101,7 @@ See [local-session-pool.ts](../examples/local-session-pool.ts).
 
 ### Cluster sessions
 
-Clients provide `ClusterSessions.clientLayer`; runners register `ClusterSessions.runnerLayer`. Both need Effect Cluster sharding. Runners additionally need the Node services and the authoritative store. A client `open` is lightweight; construction/load errors can arrive on the first operation rather than at `open`.
+Clients provide `ClusterSessions.clientLayer`; runners register `ClusterSessions.runnerLayer`. Both need Effect Cluster sharding. Runners additionally need `ModelRuntime`, the Node services, and the authoritative store. Cluster clients do not need model credentials or resource-loading layers. A client `open` is lightweight; construction/load errors can arrive on the first operation rather than at `open`.
 
 Runner defaults:
 
@@ -94,16 +129,17 @@ import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
-import { LocalSessions, Session, Sessions } from "@jpowersdev/effect-pi"
+import { LocalSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "@jpowersdev/effect-pi"
 
 const SqlLive = SqliteClient.layer({ filename: ".data/effect-pi.sqlite" })
 const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(
   Layer.provide(SqlLive)
 )
+const ModelLive = ModelRuntime.layer().pipe(Layer.provide(ResourceLoader.layer()))
 const SessionsLive = LocalSessions.layer({
   cwd: process.cwd(),
   configure: () => ({ tools: ["read", "grep", "find", "ls"] })
-}).pipe(Layer.provide([NodeServices.layer, StoreLive]))
+}).pipe(Layer.provide([ModelLive, NodeServices.layer, StoreLive]))
 
 const program = Effect.gen(function*() {
   const sessions = yield* Sessions
@@ -126,7 +162,7 @@ This example uses Pi's existing model/auth configuration and resource discovery.
 - Cancellation signals the agent, retries, compaction, summaries, and SDK bash execution. During asynchronous preflight it keeps requesting abort, so a subsequently started model run is also cancelled.
 - Interrupting a queued prompt does not abort the currently running prompt.
 - Resource release stops owned work, stops the checkpoint worker, saves final state, unsubscribes, disposes Pi, and removes temporary files.
-- Pi's asynchronous factory has no cancellation API. Acquisition waits for it to return so a late resource cannot leak. An in-flight store commit is also protected from interruption.
+- Pi's resource reload and session factory have no cancellation API. Acquisition waits for them to return so late resources can be released. Resource scopes invalidate extension runtimes even when later model/session setup fails. Model creation and credential setup receive Effect's cancellation signal. An in-flight store commit is also protected from interruption.
 
 **Cancellation is cooperative, not a hard deadline.** Broken/stalled tools, extensions, SDK acquisition, or stores can delay timeout completion and shutdown. Use bounded backend operations and process isolation when you need a forced termination boundary.
 

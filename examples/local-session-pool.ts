@@ -1,5 +1,4 @@
 /** Share sessions by id and reopen them across separate request scopes. */
-import * as Pi from "@earendil-works/pi-coding-agent"
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
@@ -9,34 +8,10 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as Redacted from "effect/Redacted"
-import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
 
-import { LocalSessions, Session, Sessions } from "@jpowersdev/effect-pi"
-
-class ExampleError extends Schema.TaggedError<ExampleError>()("ExampleError", {
-  message: Schema.String
-}) {}
-
-// Each live session gets its own loader, without global/project discovery.
-const resources = (): Pi.ResourceLoader => {
-  const extensions = { extensions: [], errors: [], runtime: Pi.createExtensionRuntime() }
-  return {
-    getExtensions: () => extensions,
-    getSkills: () => ({ skills: [], diagnostics: [] }),
-    getPrompts: () => ({ prompts: [], diagnostics: [] }),
-    getThemes: () => ({ themes: [], diagnostics: [] }),
-    getAgentsFiles: () => ({ agentsFiles: [] }),
-    getSystemPrompt: () => "You are a helpful assistant. Use the read-only tools only when asked to inspect files.",
-    getSystemPromptSource: () => undefined,
-    getAppendSystemPrompt: () => [],
-    getAppendSystemPromptSources: () => [],
-    extendResources: () => {},
-    reload: async () => {}
-  }
-}
+import { LocalSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "@jpowersdev/effect-pi"
 
 const program = Effect.gen(function*() {
   const fs = yield* FileSystem.FileSystem
@@ -53,41 +28,27 @@ const program = Effect.gen(function*() {
   const modelId = yield* Config.NonEmptyString("EFFECT_PI_MODEL")
   const apiKey = yield* Config.Redacted("EFFECT_PI_API_KEY")
 
-  const modelRuntime = yield* Effect.tryPromise({
-    try: (signal) => Pi.ModelRuntime.create({
-      authPath: path.join(directory, "auth.json"),
-      modelsPath: null,
-      refreshOnCreate: false,
-      signal
-    }),
-    catch: (cause) => new ExampleError({ message: String(cause) })
+  const ResourcesLive = ResourceLoader.layerEmpty({
+    systemPrompt: "You are a helpful assistant. Use the read-only tools only when asked to inspect files.",
+    settings: { retry: { enabled: false } }
   })
-  const model = modelRuntime.getModel(provider, modelId)
-  if (model === undefined) {
-    return yield* new ExampleError({ message: `Unknown model ${provider}/${modelId}` })
-  }
-  yield* Effect.tryPromise({
-    try: (signal) => modelRuntime.setRuntimeApiKey(provider, Redacted.value(apiKey), { signal }),
-    catch: (cause) => new ExampleError({ message: String(cause) })
-  })
-
+  const ModelLive = ModelRuntime.layer({
+    model: { provider, id: modelId },
+    apiKeys: { [provider]: apiKey },
+    authPath: path.join(directory, "auth.json"),
+    modelsPath: null,
+    refreshOnCreate: false
+  }).pipe(Layer.provide(ResourcesLive))
   const SqlLive = SqliteClient.layer({ filename: path.join(directory, "sessions.sqlite") })
   const StoreLive = KeyValueStore.layerSql({ table: "pi_sessions" }).pipe(Layer.provide(SqlLive))
   const SessionsLive = LocalSessions.layer({
     cwd,
     idleTimeToLive: "1 minute",
-    configure: () => ({
-      modelRuntime,
-      model,
-      tools: ["read", "grep", "find", "ls"],
-      settingsManager: Pi.SettingsManager.inMemory({ retry: { enabled: false } }),
-      resourceLoader: resources()
-    })
-  }).pipe(Layer.provide(StoreLive))
+    configure: () => ({ tools: ["read", "grep", "find", "ls"] })
+  }).pipe(Layer.provide([ModelLive, StoreLive]))
 
   yield* Effect.gen(function*() {
     const sessions = yield* Sessions
-
     // A request holds a reference to the session for the duration of its scope.
     yield* Effect.scoped(Effect.gen(function*() {
       const session = yield* sessions.open(id)
@@ -104,8 +65,7 @@ const program = Effect.gen(function*() {
       yield* Console.log("Result:", result)
     }))
 
-    // The pool stays alive between requests. This reuses the same live session
-    // while its idle TTL has not expired; after eviction it restores from SQLite.
+    // Reuse the same live session before the idle TTL; after eviction, restore from SQLite.
     yield* Effect.scoped(Effect.gen(function*() {
       const session = yield* sessions.open(id)
       yield* Console.log("Reopened:", yield* session.snapshot)
