@@ -62,7 +62,7 @@ There are three ways to use the library:
 
 Each example is self-contained, including its configuration and storage setup.
 
-For use in another project, see [installation and compatibility](docs/reference.md#installation-and-compatibility). The package is named `@jpowersdev/effect-pi` and currently uses Effect `4.0.0-rc.115` and Pi `0.84.4`.
+For use in another project, see [installation and compatibility](docs/reference.md#installation-and-compatibility). The package is named `@jpowersdev/effect-pi` and currently uses Effect `4.0.0-rc.116` and Pi `0.86.1`.
 
 ## A few things to know
 

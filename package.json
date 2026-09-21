@@ -29,6 +29,7 @@
     "build": "tsc -b src examples",
     "check": "tsc -b",
     "clean": "tsc -b --clean && rm -rf dist dist-test dist-examples .tsbuildinfo",
+    "prepare": "tsc -b src",
     "prepack": "pnpm clean && pnpm check && pnpm test && pnpm build",
     "test": "vitest run",
     "example:session": "pnpm build && node dist-examples/single-session.js",
@@ -36,16 +37,16 @@
     "example:cluster": "pnpm build && node dist-examples/cluster-session.js"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.84.4"
+    "@earendil-works/pi-coding-agent": "0.86.1"
   },
   "peerDependencies": {
-    "effect": "4.0.0-rc.115"
+    "effect": "4.0.0-rc.116"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0-rc.115",
-    "@effect/sql-sqlite-node": "4.0.0-rc.115",
-    "effect": "4.0.0-rc.115",
-    "@effect/vitest": "4.0.0-rc.115",
+    "@effect/platform-node": "4.0.0-rc.116",
+    "@effect/sql-sqlite-node": "4.0.0-rc.116",
+    "effect": "4.0.0-rc.116",
+    "@effect/vitest": "4.0.0-rc.116",
     "@types/node": "26.4.1",
     "typescript": "7.0.2",
     "vitest": "5.0.1"

@@ -14,17 +14,17 @@ pnpm pack --pack-destination /tmp/effect-pi-pack
 Then, from the consuming project:
 
 ```sh
-pnpm add /tmp/effect-pi-pack/jpowersdev-effect-pi-0.1.0.tgz effect@4.0.0-rc.115
+pnpm add /tmp/effect-pi-pack/jpowersdev-effect-pi-0.1.0.tgz effect@4.0.0-rc.116
 ```
 
 For a published release, use the package name in place of the tarball path.
 
-The supported configuration is Node.js 26+, ESM, Effect `4.0.0-rc.115`, and Pi `0.84.4`. Effect is an exact peer dependency while these APIs are release candidates. Keep all `@effect/*` packages on the matching release.
+The supported configuration is Node.js 26+, ESM, Effect `4.0.0-rc.116`, and Pi `0.86.1`. Effect is an exact peer dependency while these APIs are release candidates. Keep all `@effect/*` packages on the matching release.
 
-The Pi SDK is an exact runtime dependency. Normal usage and the examples don't import it directly. Add `@earendil-works/pi-coding-agent@0.84.4` only for advanced SDK interoperability. The optional Node/SQLite example dependencies are:
+The Pi SDK is an exact runtime dependency. Normal usage and the examples don't import it directly. Add `@earendil-works/pi-coding-agent@0.86.1` only for advanced SDK interoperability. The optional Node/SQLite example dependencies are:
 
 ```sh
-pnpm add @effect/platform-node@4.0.0-rc.115 @effect/sql-sqlite-node@4.0.0-rc.115
+pnpm add @effect/platform-node@4.0.0-rc.116 @effect/sql-sqlite-node@4.0.0-rc.116
 ```
 
 TypeScript consumers currently need `skipLibCheck: true` because the pinned upstream Pi/provider declarations have NodeNext compatibility issues. The library and examples are otherwise checked with strict TypeScript. Browser and CommonJS usage are not supported.

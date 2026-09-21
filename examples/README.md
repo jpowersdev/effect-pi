@@ -92,8 +92,8 @@ This is a local demonstration. Running across machines requires a shared databas
 Install `@jpowersdev/effect-pi` using a [local tarball or published release](../docs/reference.md#installation-and-compatibility), then add the packages imported by the example:
 
 ```sh
-pnpm add effect@4.0.0-rc.115 \
-  @effect/platform-node@4.0.0-rc.115 @effect/sql-sqlite-node@4.0.0-rc.115
+pnpm add effect@4.0.0-rc.116 \
+  @effect/platform-node@4.0.0-rc.116 @effect/sql-sqlite-node@4.0.0-rc.116
 ```
 
 Use an ESM project (`"type": "module"`). Node 26 can run the copied TypeScript file directly:

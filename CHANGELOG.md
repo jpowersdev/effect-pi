@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-09-21
 
 - Scoped direct, local-pool, and cluster-backed Pi sessions with authoritative KeyValueStore JSONL.
 - First-class ResourceLoader and ModelRuntime layers, typed SDK setup failures, and per-session isolation of resources, settings, and model runtimes. Session construction now requires ModelRuntime; SDK configuration callbacks no longer own these bindings.
