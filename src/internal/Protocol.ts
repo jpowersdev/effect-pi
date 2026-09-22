@@ -25,7 +25,7 @@ export const Jsonl = Rpc.make("Jsonl", {
 })
 
 export const Events = Rpc.make("Events", {
-  success: Session.Event,
+  success: Session.WireEvent,
   error: Session.Error,
   stream: true
 })

@@ -15,6 +15,7 @@ Once you've set up a `Sessions` layer, your application code looks like this:
 ```ts
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
+import * as Stream from "effect/Stream"
 
 import { Session, Sessions } from "@jpowersdev/effect-pi"
 
@@ -25,13 +26,20 @@ export const program = Effect.gen(function* () {
 
   const session = yield* sessions.open(id)
 
+  yield* session.events.pipe(
+    Stream.runForEach((event) => event._tag === "AssistantMessage"
+      ? Effect.flatMap(event.content, (content) => Console.log(content))
+      : Effect.void),
+    Effect.forkScoped({ startImmediately: true })
+  )
+
   const reply = yield* session.prompt("Explain how this project is organized")
 
   yield* Console.log(reply.text)
 }).pipe(Effect.scoped)
 ```
 
-Use the same id and storage to continue the conversation later. You can also listen to `session.events`, check progress with `session.snapshot`, or stop the current prompt with `session.abort`.
+Use the same id and storage to continue the conversation later. `AssistantMessage` events expose a finite stream of start/delta/end parts plus an awaitable `content` effect. A tool-using prompt can emit several assistant messages in sequence. You can also check progress with `session.snapshot` or stop the current prompt with `session.abort`.
 
 Model and resource setup are Effect layers too: `ResourceLoader` feeds `ModelRuntime`, which sessions consume. Define and compose them at module scope; `layerConfig` reads configuration when they're built. The library handles Pi's asynchronous setup and errors—you don't need to write Promise adapters.
 

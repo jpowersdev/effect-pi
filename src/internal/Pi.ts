@@ -151,13 +151,14 @@ export const makeWith = Effect.fn("Session.make")(function* (
     yield* Effect.logWarning("Pi extension failed to load", { sessionId: id, ...diagnostic })
   }
 
-  const events = yield* Effect.acquireRelease(PubSub.sliding<Session.Event>(1024), PubSub.shutdown)
+  const events = yield* Effect.acquireRelease(PubSub.sliding<Session.WireEvent>(1024), PubSub.shutdown)
   // A checkpoint serializes current state, not the state at notification time.
   const checkpoints = yield* Effect.acquireRelease(Queue.dropping<void>(1), Queue.shutdown)
   const operations = yield* Effect.acquireRelease(Scope.make("parallel"), (scope) => Scope.close(scope, Exit.void))
   const promptGate = yield* Semaphore.make(1)
   const saveGate = yield* Semaphore.make(1)
   let sequence = 0
+  let activeMessageSequence: number | undefined
   let closed = false
   let active: Fiber.Fiber<unknown, unknown> | undefined
 
@@ -171,7 +172,7 @@ export const makeWith = Effect.fn("Session.make")(function* (
   )
   // Sliding publish is synchronous; publishUnsafe would silently use dropping
   // behavior on overflow. This is the one synchronous SDK-to-Effect boundary.
-  const publish = (event: Session.Event): void => { Effect.runSync(PubSub.publish(events, event)) }
+  const publish = (event: Session.WireEvent): void => { Effect.runSync(PubSub.publish(events, event)) }
   yield* Effect.acquireRelease(
     Effect.try({
       try: () => pi.subscribe((event) => {
@@ -190,9 +191,33 @@ export const makeWith = Effect.fn("Session.make")(function* (
           case "agent_start":
             publish({ _tag: "Status", sequence: sequence++, status: "streaming" })
             return
+          case "message_start":
+            if (event.message.role === "assistant") {
+              const messageSequence = sequence++
+              activeMessageSequence = messageSequence
+              publish({ _tag: "MessageStart", sequence: messageSequence, messageSequence })
+            }
+            return
           case "message_update":
-            if (event.assistantMessageEvent.type === "text_delta") {
-              publish({ _tag: "TextDelta", sequence: sequence++, delta: event.assistantMessageEvent.delta })
+            if (event.assistantMessageEvent.type === "text_delta" && activeMessageSequence !== undefined) {
+              publish({
+                _tag: "MessageDelta",
+                sequence: sequence++,
+                messageSequence: activeMessageSequence,
+                delta: event.assistantMessageEvent.delta
+              })
+            }
+            return
+          case "message_end":
+            if (event.message.role === "assistant" && activeMessageSequence !== undefined) {
+              publish({
+                _tag: "MessageEnd",
+                sequence: sequence++,
+                messageSequence: activeMessageSequence,
+                content: assistantText(event.message),
+                stopReason: event.message.stopReason
+              })
+              activeMessageSequence = undefined
             }
             return
           case "tool_execution_start":
@@ -330,7 +355,10 @@ export const makeWith = Effect.fn("Session.make")(function* (
     snapshot: ensureOpen("snapshot").pipe(Effect.andThen(Effect.sync(() => snapshot(id, pi)))),
     prompt,
     abort,
-    events: Stream.unwrap(ensureOpen("events").pipe(Effect.as(Stream.fromPubSub(events)))),
+    events: Session.eventsFromWire(
+      id,
+      Stream.unwrap(ensureOpen("events").pipe(Effect.as(Stream.fromPubSub(events))))
+    ),
     jsonl: ensureOpen("jsonl").pipe(Effect.andThen(serialize(id, manager, "jsonl")))
   } satisfies Session.Session
 })

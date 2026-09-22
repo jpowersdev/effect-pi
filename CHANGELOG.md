@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 — 2026-09-21
+
+- Model each Pi assistant turn as an `AssistantMessage` event with a finite start/delta/end stream and an awaitable authoritative `content` effect.
+- Preserve the high-level message-stream API across Effect Cluster using an internal flat, schema-validated wire protocol.
+
 ## 0.1.0 — 2026-09-21
 
 - Scoped direct, local-pool, and cluster-backed Pi sessions with authoritative KeyValueStore JSONL.

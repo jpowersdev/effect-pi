@@ -111,7 +111,9 @@ const cli = Command.make("cluster-session", {
 
     // Remote subscriptions are best-effort; use the prompt result to reconcile.
     yield* session.events.pipe(
-      Stream.runForEach((event) => Console.log(event)),
+      Stream.runForEach((event) => event._tag === "AssistantMessage"
+        ? Effect.flatMap(event.content, (content) => Console.log(content))
+        : Console.log(event)),
       Effect.catch((error) => Console.warn(error)),
       Effect.forkScoped({ startImmediately: true })
     )
@@ -124,7 +126,7 @@ const cli = Command.make("cluster-session", {
   Command.provide(ClientLive)
 )
 
-const program = Command.run(cli, { version: "0.1.0" }).pipe(
+const program = Command.run(cli, { version: "0.2.0" }).pipe(
   Effect.provide(NodeServices.layer)
 )
 

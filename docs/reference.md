@@ -14,7 +14,7 @@ pnpm pack --pack-destination /tmp/effect-pi-pack
 Then, from the consuming project:
 
 ```sh
-pnpm add /tmp/effect-pi-pack/jpowersdev-effect-pi-0.1.0.tgz effect@4.0.0-rc.116
+pnpm add /tmp/effect-pi-pack/jpowersdev-effect-pi-0.2.0.tgz effect@4.0.0-rc.116
 ```
 
 For a published release, use the package name in place of the tarball path.
@@ -47,7 +47,7 @@ A session provides:
 - `prompt(text)` — accept a nonempty prompt, wait its turn, run Pi, save a checkpoint, and return a result.
 - `abort` — interrupt the active prompt and wait for settlement and a checkpoint. Queued prompts are not cancelled by this call.
 - `snapshot` — current status, message count, and last assistant text.
-- `events` — ephemeral status, text-delta, and tool lifecycle events.
+- `events` — ephemeral status, finite assistant-message streams, and tool lifecycle events.
 - `jsonl` — serialize current state. This is **not** a store flush operation.
 
 `configure(id)` synchronously returns per-session SDK options such as tool policy and thinking level. The library owns `cwd`, `sessionManager`, `modelRuntime`, `model`, `resourceLoader`, and `settingsManager`. SDK interoperability options remain version-coupled.
@@ -214,9 +214,19 @@ Token and cost fields sum usage recorded in entries appended during the invocati
 
 Operational failures use `_tag: "SessionError"` with `sessionId`, `operation`, and `message`. An explicit abort or caller interruption interrupts the prompt Effect. A failed release checkpoint surfaces as a **defect carrying `Session.Error`**, since scope finalizers do not have a typed error channel. Model-fallback and extension-load diagnostics are logged as warnings; background checkpoint failures are logged and retried at subsequent checkpoint boundaries.
 
-Events have monotonically increasing sequence numbers **per live resource**, resetting on restoration. The live buffer holds 1,024 events and discards oldest events on overflow. Slow subscribers can see gaps. There is no replay or subscription persistence. Reconcile using `snapshot`/`jsonl` or the completed prompt result; an event is not a durability acknowledgement.
+Each Pi `message_start` produces an `AssistantMessage` event. Its `stream` is a finite stream of `MessageStart`, `MessageDelta`, and `MessageEnd` parts, ending at Pi's corresponding `message_end`. Its `content` effect waits for the authoritative final text without requiring the caller to consume the part stream. Tool-using prompts can emit multiple sequential `AssistantMessage` events separated by tool lifecycle events.
 
-Start the stream before prompting. Across Cluster, starting a client fiber does not acknowledge that the remote subscription is established, so initial events can be missed. See [cluster-session.ts](../examples/cluster-session.ts) for best-effort event consumption in a scope.
+```ts
+session.events.pipe(
+  Stream.runForEach((event) => event._tag === "AssistantMessage"
+    ? Effect.flatMap(event.content, (content) => Console.log(content))
+    : Effect.void)
+)
+```
+
+Top-level and message-part events share monotonically increasing sequence numbers **per live resource**, resetting on restoration. A jump between top-level sequence numbers can contain the nested parts of an `AssistantMessage`; a jump in the flattened sequence can indicate loss. The top-level live buffer holds 1,024 events and discards oldest events on overflow; each message stream buffers its finite parts independently for one consumer. There is no replay or subscription persistence. Reconcile using `snapshot`/`jsonl` or the completed prompt result; an event is not a durability acknowledgement.
+
+Start the stream before prompting. Across Cluster, starting a client fiber does not acknowledge that the remote subscription is established, so an initial message stream can be missed. See [cluster-session.ts](../examples/cluster-session.ts) for best-effort event consumption in a scope.
 
 ## Persistence contract
 

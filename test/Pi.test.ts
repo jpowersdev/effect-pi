@@ -45,6 +45,74 @@ it.effect("serializes prompts while allowing snapshots and events", () => provid
   it.expect(yield* stored(fixture.id)).toContain("second")
 })))
 
+it.effect("exposes each assistant turn as a finite message stream with completed content", () => provide(Effect.gen(function*() {
+  const fixture = yield* FakeSdk.make({ prompt: async ({ manager, emit }) => {
+    const first = FakeSdk.assistant("I will inspect", "toolUse")
+    emit({ type: "message_start", message: first })
+    emit({
+      type: "message_update",
+      message: first,
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "I will ", partial: first }
+    })
+    emit({
+      type: "message_update",
+      message: first,
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "inspect", partial: first }
+    })
+    emit({ type: "message_end", message: first })
+    manager.appendMessage(first)
+
+    emit({ type: "tool_execution_start", toolCallId: "tool-1", toolName: "read_file", args: {} })
+    emit({
+      type: "tool_execution_end",
+      toolCallId: "tool-1",
+      toolName: "read_file",
+      result: {},
+      isError: false
+    })
+
+    const second = FakeSdk.assistant("The file is correct")
+    emit({ type: "message_start", message: second })
+    emit({
+      type: "message_update",
+      message: second,
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "The file is correct", partial: second }
+    })
+    emit({ type: "message_end", message: second })
+    manager.appendMessage(second)
+  } })
+  const session = yield* fixture.session
+  const eventsFiber = yield* session.events.pipe(
+    Stream.takeUntil((event) => event._tag === "Status" && event.status === "idle"),
+    Stream.runCollect,
+    Effect.forkScoped({ startImmediately: true })
+  )
+
+  yield* session.prompt("inspect")
+
+  const events = yield* Fiber.join(eventsFiber)
+  it.expect(events.map((event) => event._tag)).toEqual([
+    "Status",
+    "AssistantMessage",
+    "ToolStarted",
+    "ToolFinished",
+    "AssistantMessage",
+    "Status"
+  ])
+
+  const messages = events.filter((event) => event._tag === "AssistantMessage")
+  it.expect(yield* Effect.forEach(messages, (message) => message.content)).toEqual([
+    "I will inspect",
+    "The file is correct"
+  ])
+  const firstMessage = messages[0]
+  if (firstMessage === undefined) return yield* Effect.die("Expected an assistant message")
+  const firstParts = yield* firstMessage.stream.pipe(Stream.runCollect)
+  it.expect(firstParts.map((part) => part._tag)).toEqual(["MessageStart", "MessageDelta", "MessageDelta", "MessageEnd"])
+  it.expect(firstParts.filter((part) => part._tag === "MessageDelta").map((part) => part.delta).join(""))
+    .toBe("I will inspect")
+})))
+
 it.effect("interruption waits for Pi to settle and checkpoint before releasing the prompt gate", () => provide(Effect.gen(function*() {
   const finish = FakeSdk.gate()
   const fixture = yield* FakeSdk.make({ prompt: async ({ text, manager }) => {

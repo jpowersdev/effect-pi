@@ -73,7 +73,7 @@ export const runnerLayerWith = <R>(
       Abort: () => resource.get.pipe(Effect.flatMap((session) => session.abort)),
       Jsonl: () => resource.get.pipe(Effect.flatMap((session) => session.jsonl)),
       Events: () => Stream.unwrap(resource.get.pipe(
-        Effect.map((session) => session.events)
+        Effect.map((session) => Session.eventsToWire(session.events))
       ))
     })
   })
@@ -111,8 +111,11 @@ export const clientLayer: Layer.Layer<Sessions, never, Sharding.Sharding> = Laye
           abort: client.Abort().pipe(
             Effect.mapError((cause) => transportError(id, "abort", cause))
           ),
-          events: client.Events().pipe(
-            Stream.mapError((cause) => transportError(id, "events", cause))
+          events: Session.eventsFromWire(
+            id,
+            client.Events().pipe(
+              Stream.mapError((cause) => transportError(id, "events", cause))
+            )
           ),
           jsonl: client.Jsonl().pipe(
             Effect.mapError((cause) => transportError(id, "jsonl", cause))
