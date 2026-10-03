@@ -40,13 +40,13 @@
     "@earendil-works/pi-coding-agent": "0.86.1"
   },
   "peerDependencies": {
-    "effect": "4.0.0-rc.116"
+    "effect": "^4.0.0"
   },
   "devDependencies": {
-    "@effect/platform-node": "4.0.0-rc.116",
-    "@effect/sql-sqlite-node": "4.0.0-rc.116",
-    "effect": "4.0.0-rc.116",
-    "@effect/vitest": "4.0.0-rc.116",
+    "@effect/platform-node": "4.0.0",
+    "@effect/sql-sqlite-node": "4.0.0",
+    "effect": "4.0.0",
+    "@effect/vitest": "4.0.0",
     "@types/node": "26.4.1",
     "typescript": "7.0.2",
     "vitest": "5.0.1"

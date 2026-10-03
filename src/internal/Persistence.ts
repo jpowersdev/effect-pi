@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect"
-import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+import * as KeyValueStore from "effect/persistence/KeyValueStore"
 
 import * as Session from "./Session.js"
 

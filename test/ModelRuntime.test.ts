@@ -7,7 +7,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Redacted from "effect/Redacted"
-import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+import * as KeyValueStore from "effect/persistence/KeyValueStore"
 
 import * as ModelRuntime from "../src/ModelRuntime.js"
 import * as ResourceLoader from "../src/ResourceLoader.js"

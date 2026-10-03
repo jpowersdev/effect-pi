@@ -10,7 +10,7 @@ import * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
 import * as Stream from "effect/Stream"
-import type * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+import type * as KeyValueStore from "effect/persistence/KeyValueStore"
 
 import * as ModelRuntime from "./ModelRuntime.js"
 import * as Persistence from "./Persistence.js"

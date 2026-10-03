@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema"
-import * as Entity from "effect/unstable/cluster/Entity"
-import * as Rpc from "effect/unstable/rpc/Rpc"
+import * as Entity from "effect/cluster/Entity"
+import * as Rpc from "effect/rpc/Rpc"
 
 import * as Session from "./Session.js"
 

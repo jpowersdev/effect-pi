@@ -7,8 +7,8 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as TestRunner from "effect/unstable/cluster/TestRunner"
-import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+import * as TestRunner from "effect/cluster/TestRunner"
+import * as KeyValueStore from "effect/persistence/KeyValueStore"
 
 import { ClusterSessions, LocalSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "../src/index.js"
 

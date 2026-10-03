@@ -9,7 +9,7 @@ import * as Layer from "effect/Layer"
 import * as Scope from "effect/Scope"
 import * as Stream from "effect/Stream"
 import * as TestClock from "effect/testing/TestClock"
-import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+import * as KeyValueStore from "effect/persistence/KeyValueStore"
 
 import * as Session from "../src/Session.js"
 import * as FakeSdk from "./FakeSdk.js"
