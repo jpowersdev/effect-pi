@@ -7,8 +7,8 @@ This document describes application structure and correctness conventions. It is
 not a product architecture. Copy or reference it from a repository's
 `AGENTS.md`, then add product-specific rules separately.
 
-> Effect v4 APIs used here may live under `effect/unstable/*`. Pin compatible
-> Effect packages to the same exact version and verify APIs when upgrading.
+> Pin compatible Effect packages to the same exact version and verify APIs when
+> upgrading.
 
 ## Core laws
 
@@ -38,7 +38,6 @@ not a product architecture. Copy or reference it from a repository's
 - Pin `effect`, `@effect/*`, and `@effect/vitest` to the same exact release.
 - Prefer exact versions for foundational runtime packages. Upgrade them as one
   reviewed change.
-- Treat modules under `effect/unstable/*` as version-sensitive boundaries.
 
 A typical package starts with scripts like:
 
