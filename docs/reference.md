@@ -14,17 +14,17 @@ pnpm pack --pack-destination /tmp/effect-pi-pack
 Then, from the consuming project:
 
 ```sh
-pnpm add /tmp/effect-pi-pack/jpowersdev-effect-pi-0.2.0.tgz effect@4.0.0-rc.116
+pnpm add /tmp/effect-pi-pack/jpowersdev-effect-pi-0.3.0.tgz effect@^4.0.0
 ```
 
 For a published release, use the package name in place of the tarball path.
 
-The supported configuration is Node.js 26+, ESM, Effect `4.0.0-rc.116`, and Pi `0.86.1`. Effect is an exact peer dependency while these APIs are release candidates. Keep all `@effect/*` packages on the matching release.
+The supported configuration is Node.js 26+, ESM, Effect `^4.0.0`, and Pi `0.86.1`. Effect is a peer dependency. Keep all `@effect/*` packages on the same release as `effect`.
 
 The Pi SDK is an exact runtime dependency. Normal usage and the examples don't import it directly. Add `@earendil-works/pi-coding-agent@0.86.1` only for advanced SDK interoperability. The optional Node/SQLite example dependencies are:
 
 ```sh
-pnpm add @effect/platform-node@4.0.0-rc.116 @effect/sql-sqlite-node@4.0.0-rc.116
+pnpm add @effect/platform-node@^4.0.0 @effect/sql-sqlite-node@^4.0.0
 ```
 
 TypeScript consumers currently need `skipLibCheck: true` because the pinned upstream Pi/provider declarations have NodeNext compatibility issues. The library and examples are otherwise checked with strict TypeScript. Browser and CommonJS usage are not supported.
@@ -151,7 +151,7 @@ import * as SqliteClient from "@effect/sql-sqlite-node/SqliteClient"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as KeyValueStore from "effect/unstable/persistence/KeyValueStore"
+import * as KeyValueStore from "effect/persistence/KeyValueStore"
 
 import { LocalSessions, ModelRuntime, ResourceLoader, Session, Sessions } from "@jpowersdev/effect-pi"
 

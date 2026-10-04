@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0 — 2026-10-03
+
+- Require Effect `^4.0.0` stable as the peer dependency instead of an exact release candidate.
+- Import former `effect/unstable/*` modules (CLI, Cluster, RPC, persistence) from their stable paths.
+
 ## 0.2.0 — 2026-09-21
 
 - Model each Pi assistant turn as an `AssistantMessage` event with a finite start/delta/end stream and an awaitable authoritative `content` effect.
